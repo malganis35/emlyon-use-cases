@@ -1,33 +1,33 @@
 -- =============================================================================
 -- 01_setup_snowflake.sql
--- Cible : Snowflake - Web Interface (Snowsight) ou SnowSQL
--- Objet : Database, schémas, warehouse, formats de fichier et stages pour le cours BI
--- Idempotent : oui (relançable sans effet de bord)
--- Durée d'exécution : ~15 secondes
+-- Target : Snowflake - Web Interface (Snowsight) or SnowSQL
+-- Object : Database, schemas, warehouse, file formats, and stages for BI course
+-- Idempotent : Yes (safe to re-run)
+-- Execution time : ~15 seconds
 -- =============================================================================
 
 -- 1. Database ------------------------------------------------------------------
 CREATE DATABASE IF NOT EXISTS EMLYON_USE_CASES
-  COMMENT = 'Jeux de données pédagogiques emlyon - cours BI & DataViz (Power BI / Tableau)';
+  COMMENT = 'Pedagogical datasets for emlyon BI & DataViz course (Power BI / Tableau)';
 
 USE DATABASE EMLYON_USE_CASES;
 
--- 2. Schémas (1 par use case) --------------------------------------------------
+-- 2. Schemas (1 per use case) --------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS GDP
-  COMMENT = 'Use case 1 - Espérance de vie vs PIB par habitant (Our World in Data)';
+  COMMENT = 'Use case 1 - Life Expectancy vs GDP per capita (Our World in Data)';
 
 CREATE SCHEMA IF NOT EXISTS SUPERSTORE
-  COMMENT = 'Use case 2 - EU Superstore migré en 2 lots';
+  COMMENT = 'Use case 2 - EU Superstore migrated in 2 batches';
 
--- 3. Virtual Warehouse (Taille minimale XSMALL) ---------------------------------
+-- 3. Virtual Warehouse (Minimum size XSMALL) ----------------------------------
 CREATE WAREHOUSE IF NOT EXISTS EMLYON_WH
   WITH WAREHOUSE_SIZE = 'XSMALL'
   AUTO_SUSPEND = 60
   AUTO_RESUME = TRUE
   INITIALLY_SUSPENDED = TRUE
-  COMMENT = 'Warehouse dédié au cours BI emlyon';
+  COMMENT = 'Warehouse dedicated to emlyon BI course';
 
--- 4. Formats de fichiers (CSV avec séparateur point-virgule) -------------------
+-- 4. File Formats (Semicolon-delimited CSV) -----------------------------------
 CREATE OR REPLACE FILE FORMAT GDP.CSV_FORMAT_SEMICOLON
   TYPE = 'CSV'
   FIELD_DELIMITER = ';'
@@ -36,7 +36,7 @@ CREATE OR REPLACE FILE FORMAT GDP.CSV_FORMAT_SEMICOLON
   NULL_IF = ('', 'NULL')
   EMPTY_FIELD_AS_NULL = TRUE
   ENCODING = 'UTF8'
-  COMMENT = 'Format CSV point-virgule avec en-tête pour le schema GDP';
+  COMMENT = 'Semicolon-delimited CSV format with header for GDP schema';
 
 CREATE OR REPLACE FILE FORMAT SUPERSTORE.CSV_FORMAT_SEMICOLON
   TYPE = 'CSV'
@@ -46,18 +46,18 @@ CREATE OR REPLACE FILE FORMAT SUPERSTORE.CSV_FORMAT_SEMICOLON
   NULL_IF = ('', 'NULL')
   EMPTY_FIELD_AS_NULL = TRUE
   ENCODING = 'UTF8'
-  COMMENT = 'Format CSV point-virgule avec en-tête pour le schema SUPERSTORE';
+  COMMENT = 'Semicolon-delimited CSV format with header for SUPERSTORE schema';
 
--- 5. Stages internes (dépôt des fichiers sources) -----------------------------
+-- 5. Internal Stages (Raw files staging area) ---------------------------------
 CREATE STAGE IF NOT EXISTS GDP.RAW_STAGE
   FILE_FORMAT = GDP.CSV_FORMAT_SEMICOLON
-  COMMENT = 'Stage interne pour les fichiers sources GDP';
+  COMMENT = 'Internal stage for raw GDP source files';
 
 CREATE STAGE IF NOT EXISTS SUPERSTORE.RAW_STAGE
   FILE_FORMAT = SUPERSTORE.CSV_FORMAT_SEMICOLON
-  COMMENT = 'Stage interne pour les fichiers sources Superstore';
+  COMMENT = 'Internal stage for raw Superstore source files';
 
--- 6. Vérification --------------------------------------------------------------
+-- 6. Verification --------------------------------------------------------------
 SHOW STAGES IN DATABASE EMLYON_USE_CASES;
 
--- >>> ÉTAPE SUIVANTE : exécuter 02_upload_files.sh depuis le terminal local
+-- >>> NEXT STEP: Run 02_upload_files.sh from local terminal

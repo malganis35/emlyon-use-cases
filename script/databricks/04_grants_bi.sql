@@ -1,61 +1,61 @@
 -- =============================================================================
 -- 04_grants_bi.sql
--- Objet : droits LECTURE SEULE pour le service principal utilise par les
---         etudiants dans Power BI et Tableau.
--- Duree : ~15 secondes
+-- Object : READ-ONLY privileges for the service principal used by students
+--          in Power BI and Tableau.
+-- Duration : ~15 seconds
 --
--- PREREQUIS : le service principal doit exister AVANT de lancer ce script.
---             Voir la section A ci-dessous (interface, ~5 minutes).
+-- PREREQUISITE : The service principal MUST be created in the UI BEFORE running this script.
+--                See Section A below (~5 minutes UI setup).
 --
--- REMPLACER <<CLIENT_ID>> par l'Application ID du service principal
--- (un UUID du type 12ab34cd-5678-90ef-1234-567890abcdef).
--- /!\ Unity Catalog attend l'Application ID, PAS le nom d'affichage.
+-- REPLACE <<CLIENT_ID>> with the Application ID of the service principal
+-- (a UUID like 12ab34cd-5678-90ef-1234-567890abcdef).
+-- /!\ Unity Catalog expects the Application ID, NOT the display name.
 -- =============================================================================
 
 -- =============================================================================
--- A. A FAIRE DANS L'INTERFACE AVANT CE SCRIPT
+-- A. UI STEPS BEFORE RUNNING THIS SCRIPT
 --
 --  1. Settings > Identity and access > Service principals > Add service principal
---     Nom : db-invite-bi
---  2. Onglet Configurations du SP : cocher les entitlements
+--     Name: db-invite-bi
+2. Service Principal Configurations tab: check entitlements
 --       - Workspace access
 --       - Databricks SQL access
---     Ne PAS cocher Allow unrestricted cluster creation ni Admin.
---  3. Onglet Secrets : Generate secret
---     Noter Client ID et Client secret : le secret n'est affiche qu'une fois.
---  4. SQL Warehouse > Permissions > ajouter db-invite-bi en CAN USE
---  5. SQL Warehouse > Connection details : noter Server hostname et HTTP path
+--     Do NOT check Allow unrestricted cluster creation or Admin.
+--  3. Secrets tab: Generate secret
+--     Note Client ID and Client secret (the secret is shown only once).
+--  4. SQL Warehouse > Permissions > add db-invite-bi as CAN USE
+--  5. SQL Warehouse > Connection details: note Server hostname and HTTP path
 -- =============================================================================
 
 -- =============================================================================
--- B. DROITS UNITY CATALOG (lecture seule)
+-- B. UNITY CATALOG PRIVILEGES (Read-Only)
 -- =============================================================================
 
--- B.1 Traversee du catalogue et des schemas ------------------------------------
+-- B.1 Catalog and Schema Traversal --------------------------------------------
 GRANT USE CATALOG ON CATALOG emlyon_use_cases            TO `<<CLIENT_ID>>`;
 GRANT USE SCHEMA  ON SCHEMA  emlyon_use_cases.gdp        TO `<<CLIENT_ID>>`;
 GRANT USE SCHEMA  ON SCHEMA  emlyon_use_cases.superstore TO `<<CLIENT_ID>>`;
 
--- B.2 Lecture des tables (SELECT au niveau schema : couvre les tables futures) --
+-- B.2 Table Select Privileges (Schema-level SELECT covers future tables) -------
 GRANT SELECT ON SCHEMA emlyon_use_cases.gdp        TO `<<CLIENT_ID>>`;
 GRANT SELECT ON SCHEMA emlyon_use_cases.superstore TO `<<CLIENT_ID>>`;
 
--- B.3 Lecture des fichiers sources (exercice "connexion au CSV brut") ----------
+-- B.3 Raw Volume Read Privileges ("Raw CSV connection" exercise) ---------------
 GRANT READ VOLUME ON VOLUME emlyon_use_cases.gdp.raw_files        TO `<<CLIENT_ID>>`;
 GRANT READ VOLUME ON VOLUME emlyon_use_cases.superstore.raw_files TO `<<CLIENT_ID>>`;
 
 -- =============================================================================
 -- C. VERIFICATION
---    Attendu : uniquement USE CATALOG / USE SCHEMA / SELECT / READ VOLUME.
---    Aucun MODIFY, CREATE TABLE, ALL PRIVILEGES ne doit apparaitre.
+--    Expected: ONLY USE CATALOG / USE SCHEMA / SELECT / READ VOLUME.
+--    No MODIFY, CREATE TABLE, or ALL PRIVILEGES should appear.
 -- =============================================================================
 SHOW GRANTS `<<CLIENT_ID>>` ON CATALOG emlyon_use_cases;
 SHOW GRANTS `<<CLIENT_ID>>` ON SCHEMA  emlyon_use_cases.gdp;
 SHOW GRANTS `<<CLIENT_ID>>` ON SCHEMA  emlyon_use_cases.superstore;
 
 -- =============================================================================
--- D. REVOCATION EN FIN DE SEMESTRE (decommenter)
+-- D. END-OF-SEMESTER REVOCATION (uncomment)
 -- =============================================================================
 -- REVOKE ALL PRIVILEGES ON CATALOG emlyon_use_cases FROM `<<CLIENT_ID>>`;
--- Puis supprimer le secret dans Settings > Identity and access > Service principals.
+-- Then delete secret in Settings > Identity and access > Service principals.
 -- =============================================================================

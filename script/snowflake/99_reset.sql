@@ -1,8 +1,8 @@
 -- =============================================================================
 -- 99_reset.sql (Snowflake)
--- DESTRUCTIF : supprime la base de données, le warehouse, le rôle et l'utilisateur.
--- À utiliser entre deux promotions.
--- Décommenter les lignes pour l'exécuter.
+-- DESTRUCTIVE: Drops database, warehouse, role, and user.
+-- To be used between academic cohorts.
+-- Uncomment lines to execute.
 -- =============================================================================
 
 -- USE ROLE ACCOUNTADMIN;

@@ -1,12 +1,12 @@
 -- =============================================================================
 -- 99_reset.sql
--- DESTRUCTIF : supprime le catalogue, les schémas, les volumes, les tables ET
--- les fichiers uploadés. À utiliser entre deux promotions.
--- Décommenter la ligne pour l'exécuter.
+-- DESTRUCTIVE: Drops catalog, schemas, volumes, tables AND uploaded files.
+-- To be used between academic cohorts.
+-- Uncomment the line to execute.
 -- =============================================================================
 
 -- DROP CATALOG IF EXISTS emlyon_use_cases CASCADE;
 
--- Suppression ciblée d'un seul use case :
+-- Targeted cleanup of a single use case:
 -- DROP SCHEMA IF EXISTS emlyon_use_cases.gdp        CASCADE;
 -- DROP SCHEMA IF EXISTS emlyon_use_cases.superstore CASCADE;
