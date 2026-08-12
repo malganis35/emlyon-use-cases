@@ -16,7 +16,7 @@ command -v databricks >/dev/null 2>&1 || {
 }
 
 # --- Paramètres ---------------------------------------------------------------
-PROFILE="${DATABRICKS_PROFILE:-DEFAULT}"
+PROFILE="${DATABRICKS_PROFILE:-emlyon}"
 SRC_DIR="${1:-./data}"          # dossier contenant les fichiers d'origine
 CATALOG="emlyon_use_cases"
 
