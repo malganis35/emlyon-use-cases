@@ -58,6 +58,10 @@ if os.path.exists(p):
 " 2>/dev/null || true)"
 fi
 
+if [[ -n "${CFG_PASSWORD:-}" ]]; then
+  export SNOWSQL_PWD="$CFG_PASSWORD"
+fi
+
 # --- Fonction : PUT vers un stage Snowflake -----------------------------------
 upload_stage() {
   local file="$1" schema="$2"
@@ -68,20 +72,20 @@ upload_stage() {
   echo "-> Upload : $file  =>  @$DATABASE.$schema.RAW_STAGE"
 
   if [[ -n "$CFG_ACCOUNT" && -n "$CFG_USER" ]]; then
-    SNOWSQL_PWD="$CFG_PASSWORD" snowsql \
+    snowsql \
       -a "$CFG_ACCOUNT" \
       -u "$CFG_USER" \
       ${CFG_WAREHOUSE:+-w "$CFG_WAREHOUSE"} \
       ${CFG_ROLE:+-r "$CFG_ROLE"} \
       -d "$DATABASE" \
       -s "$schema" \
-      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE AUTO_COMPRESS = FALSE;" \
+      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE; !exit" \
       -o quiet=true
   else
     snowsql -c "$CONNECTION" \
       -d "$DATABASE" \
       -s "$schema" \
-      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE AUTO_COMPRESS = FALSE;" \
+      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE; !exit" \
       -o quiet=true
   fi
 }
