@@ -7,10 +7,12 @@ authors = [
     { name = "Cao Tri DO", email = "caotri.do88@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "openpyxl>=3.1.0",
+]
 
 [project.scripts]
-emlyon-use-cases = "emlyon_use_cases:main"
+emlyon-use-cases = "emlyon_use_cases.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]

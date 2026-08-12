@@ -12,18 +12,24 @@ Deux use cases, cinq fichiers, deux schémas. Compter **20 minutes** au premier 
 | 4 | `04_grants_bi.sql` | SQL Editor Databricks | 15 s |
 | 5 | UI : warehouse `CAN USE` + service principal | interface | 5 min |
 
-Le dossier source attendu par l'étape 2 contient :
+Le dossier `./data` peut être généré automatiquement à partir des fichiers sources de `use_cases/` avec :
+
+```bash
+uv run emlyon-use-cases prepare
+```
+
+Ce dossier contient :
 
 ```
 data/
 ├── life-expectancy-vs-gdp-per-capita_-_cleaned.csv
-├── continent_mapping.csv                              # converti depuis Mapping_Table.xlsx
+├── continent_mapping.csv                              # converti depuis Mapping Table.xlsx
 ├── Sample_-_EU_Superstore_Migrated_Data_-_Part_1.csv
 ├── Sample_-_EU_Superstore_Migrated_Data_-_Part_2.csv
 └── nomenclature.csv                                   # converti depuis Nomenclature.xlsx
 ```
 
-Lancer avec `bash 02_upload_files.sh ./data`.
+Lancer l'upload avec `bash script/databricks/02_upload_files.sh ./data`.
 
 ## Modèle produit
 

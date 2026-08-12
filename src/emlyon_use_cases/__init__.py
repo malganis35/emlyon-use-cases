@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from emlyon-use-cases!")
+from emlyon_use_cases.cli import main
+
+__all__ = ["main"]
