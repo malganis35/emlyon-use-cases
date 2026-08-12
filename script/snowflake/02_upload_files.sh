@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 02_upload_files.sh (Snowflake)
-# Object : Uploads the 5 source files into Snowflake internal stages
+# Object : Uploads the 9 source files into Snowflake internal stages
 # Prerequisites : SnowSQL (snowsql CLI) installed and configured
-# Duration : ~45 seconds
+# Duration : ~5 seconds
 # =============================================================================
 set -euo pipefail
 
@@ -17,88 +17,79 @@ command -v snowsql >/dev/null 2>&1 || {
 # --- Parameters ---------------------------------------------------------------
 SRC_DIR="${1:-./data}"
 CONNECTION="${SNOWSQL_CONN:-emlyon}"
-DATABASE="EMLYON_USE_CASES"
 
-if [[ ! -d "$SRC_DIR" ]]; then
-  echo "ERROR: Source directory '$SRC_DIR' does not exist."
-  echo "Usage: $0 [data_directory]"
-  exit 1
-fi
+python3 -c "
+import os, sys, subprocess, tomllib
 
-echo "=== Snowflake File Upload Process ==="
-echo "Source directory : $SRC_DIR"
-echo "Connection       : $CONNECTION"
-echo "Database         : $DATABASE"
-echo
-
-# --- Automatic detection of connection in ~/.snowflake/connections.toml -------
-CFG_ACCOUNT=""
-CFG_USER=""
-CFG_PASSWORD=""
-CFG_WAREHOUSE=""
-CFG_ROLE=""
-
-if command -v python3 >/dev/null 2>&1; then
-  eval "$(python3 -c "
-import os, sys, tomllib
+src_dir = os.path.abspath('$SRC_DIR')
 conn = '$CONNECTION'
 p = os.path.expanduser('~/.snowflake/connections.toml')
+
+cfg = {}
 if os.path.exists(p):
     try:
         data = tomllib.load(open(p, 'rb'))
         if conn in data:
-            c = data[conn]
-            print(f'CFG_ACCOUNT=\"{c.get(\"account\", \"\")}\"')
-            print(f'CFG_USER=\"{c.get(\"user\", \"\")}\"')
-            print(f'CFG_PASSWORD=\"{c.get(\"password\", \"\")}\"')
-            print(f'CFG_WAREHOUSE=\"{c.get(\"warehouse\", \"\")}\"')
-            print(f'CFG_ROLE=\"{c.get(\"role\", \"\")}\"')
+            cfg = data[conn]
     except Exception:
         pass
-" 2>/dev/null || true)"
-fi
 
-if [[ -n "${CFG_PASSWORD:-}" ]]; then
-  export SNOWSQL_PWD="$CFG_PASSWORD"
-fi
+env = os.environ.copy()
+if cfg.get('password'):
+    env['SNOWSQL_PWD'] = cfg['password']
 
-# --- Function: PUT file to Snowflake stage -----------------------------------
-upload_stage() {
-  local file="$1" schema="$2"
-  local src_path="$SRC_DIR/$file"
+uploads = [
+    ('life_expectancy.csv', 'GDP'),
+    ('continent_mapping.csv', 'GDP'),
+    ('superstore_part1.csv', 'SUPERSTORE'),
+    ('superstore_part2.csv', 'SUPERSTORE'),
+    ('nomenclature.csv', 'SUPERSTORE'),
+    ('allsales_part1.csv', 'ALLSALES'),
+    ('allsales_part2.csv', 'ALLSALES'),
+    ('allsales_team.csv', 'ALLSALES'),
+    ('allsales_store.csv', 'ALLSALES'),
+]
 
-  [[ -f "$src_path" ]] || { echo "ERROR: Missing source file: $src_path"; exit 1; }
+print('=== Snowflake File Upload Process ===')
+print(f'Source directory : {src_dir}')
+print(f'Connection       : {conn}')
+print(f'Database         : EMLYON_USE_CASES')
+print()
 
-  echo "-> Uploading: $file  =>  @$DATABASE.$schema.RAW_STAGE"
+lines = ['USE DATABASE EMLYON_USE_CASES;']
+for filename, schema in uploads:
+    filepath = os.path.join(src_dir, filename)
+    if not os.path.exists(filepath):
+        print(f'ERROR: Missing file {filepath}', file=sys.stderr)
+        sys.exit(1)
+    lines.append(f'USE SCHEMA {schema};')
+    lines.append(f'PUT file://{filepath} @RAW_STAGE OVERWRITE=TRUE AUTO_COMPRESS=FALSE;')
 
-  if [[ -n "$CFG_ACCOUNT" && -n "$CFG_USER" ]]; then
-    snowsql \
-      -a "$CFG_ACCOUNT" \
-      -u "$CFG_USER" \
-      ${CFG_WAREHOUSE:+-w "$CFG_WAREHOUSE"} \
-      ${CFG_ROLE:+-r "$CFG_ROLE"} \
-      -d "$DATABASE" \
-      -s "$schema" \
-      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE; !exit" \
-      -o quiet=true
-  else
-    snowsql -c "$CONNECTION" \
-      -d "$DATABASE" \
-      -s "$schema" \
-      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE; !exit" \
-      -o quiet=true
-  fi
-}
+batch_sql = os.path.join(src_dir, '_upload_batch.sql')
+with open(batch_sql, 'w') as f:
+    f.write('\n'.join(lines) + '\n')
 
-# --- Upload GDP Files ---------------------------------------------------------
-upload_stage "life_expectancy.csv"   "GDP"
-upload_stage "continent_mapping.csv" "GDP"
+cmd = ['snowsql']
+if cfg.get('account') and cfg.get('user'):
+    cmd.extend(['-a', cfg['account'], '-u', cfg['user']])
+    if cfg.get('warehouse'):
+        cmd.extend(['-w', cfg['warehouse']])
+    if cfg.get('role'):
+        cmd.extend(['-r', cfg['role']])
+else:
+    cmd.extend(['-c', conn])
 
-# --- Upload Superstore Files --------------------------------------------------
-upload_stage "superstore_part1.csv"  "SUPERSTORE"
-upload_stage "superstore_part2.csv"  "SUPERSTORE"
-upload_stage "nomenclature.csv"      "SUPERSTORE"
+cmd.extend(['-f', batch_sql, '-o', 'exit_on_error=true', '-o', 'quiet=true'])
 
-echo
-echo "=== Success: 5 files transferred to Snowflake internal stages ==="
-echo "NEXT STEP: Run 03_load_tables.sql"
+res = subprocess.run(cmd, env=env, capture_output=True, text=True)
+
+if os.path.exists(batch_sql):
+    os.remove(batch_sql)
+
+if res.returncode != 0:
+    print(f'ERROR: {res.stderr.strip() or res.stdout.strip()}', file=sys.stderr)
+    sys.exit(res.returncode)
+
+print('=== Success: 9 files transferred to Snowflake internal stages ===')
+print('NEXT STEP: Run 03_load_tables.sql')
+"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 02_upload_files.sh
-# Object : Normalizes (BOM + CRLF) then uploads the 5 raw files into Unity Catalog
+# Object : Normalizes (BOM + CRLF) then uploads the 9 raw files into Unity Catalog
 #          volumes created by 01_setup_unity_catalog.sql
 # Prerequisites : Databricks CLI v0.205+ authenticated (databricks auth login)
-# Duration : ~1 minute
+# Duration : ~1-2 minutes
 # =============================================================================
 set -euo pipefail
 
@@ -52,6 +52,12 @@ normalize "$SRC_DIR/superstore_part1.csv"   "$TMP_DIR/superstore_part1.csv"
 normalize "$SRC_DIR/superstore_part2.csv"   "$TMP_DIR/superstore_part2.csv"
 normalize "$SRC_DIR/nomenclature.csv"       "$TMP_DIR/nomenclature.csv"
 
+# --- Allsales Use Case --------------------------------------------------------
+normalize "$SRC_DIR/allsales_part1.csv"     "$TMP_DIR/allsales_part1.csv"
+normalize "$SRC_DIR/allsales_part2.csv"     "$TMP_DIR/allsales_part2.csv"
+normalize "$SRC_DIR/allsales_team.csv"      "$TMP_DIR/allsales_team.csv"
+normalize "$SRC_DIR/allsales_store.csv"     "$TMP_DIR/allsales_store.csv"
+
 echo
 
 # --- Upload -------------------------------------------------------------------
@@ -67,7 +73,11 @@ upload continent_mapping.csv  gdp
 upload superstore_part1.csv   superstore
 upload superstore_part2.csv   superstore
 upload nomenclature.csv       superstore
+upload allsales_part1.csv     allsales
+upload allsales_part2.csv     allsales
+upload allsales_team.csv      allsales
+upload allsales_store.csv     allsales
 
 echo
-echo "=== Success: 5 files transferred to /Volumes/$CATALOG/{gdp,superstore}/raw_files/ ==="
+echo "=== Success: 9 files transferred to /Volumes/$CATALOG/{gdp,superstore,allsales}/raw_files/ ==="
 echo "NEXT STEP: Run 03_load_tables.sql"

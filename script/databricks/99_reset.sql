@@ -10,3 +10,4 @@
 -- Targeted cleanup of a single use case:
 -- DROP SCHEMA IF EXISTS emlyon_use_cases.gdp        CASCADE;
 -- DROP SCHEMA IF EXISTS emlyon_use_cases.superstore CASCADE;
+-- DROP SCHEMA IF EXISTS emlyon_use_cases.allsales   CASCADE;

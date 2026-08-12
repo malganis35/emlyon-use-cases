@@ -17,7 +17,7 @@
 --
 --  1. Settings > Identity and access > Service principals > Add service principal
 --     Name: db-invite-bi
-2. Service Principal Configurations tab: check entitlements
+--  2. Service Principal Configurations tab: check entitlements
 --       - Workspace access
 --       - Databricks SQL access
 --     Do NOT check Allow unrestricted cluster creation or Admin.
@@ -35,14 +35,17 @@
 GRANT USE CATALOG ON CATALOG emlyon_use_cases            TO `<<CLIENT_ID>>`;
 GRANT USE SCHEMA  ON SCHEMA  emlyon_use_cases.gdp        TO `<<CLIENT_ID>>`;
 GRANT USE SCHEMA  ON SCHEMA  emlyon_use_cases.superstore TO `<<CLIENT_ID>>`;
+GRANT USE SCHEMA  ON SCHEMA  emlyon_use_cases.allsales   TO `<<CLIENT_ID>>`;
 
 -- B.2 Table Select Privileges (Schema-level SELECT covers future tables) -------
 GRANT SELECT ON SCHEMA emlyon_use_cases.gdp        TO `<<CLIENT_ID>>`;
 GRANT SELECT ON SCHEMA emlyon_use_cases.superstore TO `<<CLIENT_ID>>`;
+GRANT SELECT ON SCHEMA emlyon_use_cases.allsales   TO `<<CLIENT_ID>>`;
 
 -- B.3 Raw Volume Read Privileges ("Raw CSV connection" exercise) ---------------
 GRANT READ VOLUME ON VOLUME emlyon_use_cases.gdp.raw_files        TO `<<CLIENT_ID>>`;
 GRANT READ VOLUME ON VOLUME emlyon_use_cases.superstore.raw_files TO `<<CLIENT_ID>>`;
+GRANT READ VOLUME ON VOLUME emlyon_use_cases.allsales.raw_files   TO `<<CLIENT_ID>>`;
 
 -- =============================================================================
 -- C. VERIFICATION
@@ -52,6 +55,7 @@ GRANT READ VOLUME ON VOLUME emlyon_use_cases.superstore.raw_files TO `<<CLIENT_I
 SHOW GRANTS `<<CLIENT_ID>>` ON CATALOG emlyon_use_cases;
 SHOW GRANTS `<<CLIENT_ID>>` ON SCHEMA  emlyon_use_cases.gdp;
 SHOW GRANTS `<<CLIENT_ID>>` ON SCHEMA  emlyon_use_cases.superstore;
+SHOW GRANTS `<<CLIENT_ID>>` ON SCHEMA  emlyon_use_cases.allsales;
 
 -- =============================================================================
 -- D. END-OF-SEMESTER REVOCATION (uncomment)
