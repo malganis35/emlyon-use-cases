@@ -218,7 +218,10 @@ CREATE OR REPLACE TABLE ALLSALES.RAW_TEAM (
 COMMENT = 'Sales agents reference table.';
 
 COPY INTO ALLSALES.RAW_TEAM
-FROM @ALLSALES.RAW_STAGE/allsales_team.csv
+FROM (
+  SELECT t.$2, t.$3, t.$4
+  FROM @ALLSALES.RAW_STAGE/allsales_team.csv t
+)
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
@@ -242,7 +245,10 @@ CREATE OR REPLACE TABLE ALLSALES.RAW_STORE (
 COMMENT = 'Store locations and demographic metadata.';
 
 COPY INTO ALLSALES.RAW_STORE
-FROM @ALLSALES.RAW_STAGE/allsales_store.csv
+FROM (
+  SELECT t.$2, t.$3, t.$5, t.$6, t.$7, t.$8, t.$9, t.$10, t.$11, t.$12, t.$13, t.$14, t.$15, t.$16
+  FROM @ALLSALES.RAW_STAGE/allsales_store.csv t
+)
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
