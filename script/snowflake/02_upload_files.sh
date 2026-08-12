@@ -31,6 +31,33 @@ echo "Connexion      : $CONNECTION"
 echo "Database       : $DATABASE"
 echo
 
+# --- Détection automatique de la connexion dans ~/.snowflake/connections.toml --
+CFG_ACCOUNT=""
+CFG_USER=""
+CFG_PASSWORD=""
+CFG_WAREHOUSE=""
+CFG_ROLE=""
+
+if command -v python3 >/dev/null 2>&1; then
+  eval "$(python3 -c "
+import os, sys, tomllib
+conn = '$CONNECTION'
+p = os.path.expanduser('~/.snowflake/connections.toml')
+if os.path.exists(p):
+    try:
+        data = tomllib.load(open(p, 'rb'))
+        if conn in data:
+            c = data[conn]
+            print(f'CFG_ACCOUNT=\"{c.get(\"account\", \"\")}\"')
+            print(f'CFG_USER=\"{c.get(\"user\", \"\")}\"')
+            print(f'CFG_PASSWORD=\"{c.get(\"password\", \"\")}\"')
+            print(f'CFG_WAREHOUSE=\"{c.get(\"warehouse\", \"\")}\"')
+            print(f'CFG_ROLE=\"{c.get(\"role\", \"\")}\"')
+    except Exception:
+        pass
+" 2>/dev/null || true)"
+fi
+
 # --- Fonction : PUT vers un stage Snowflake -----------------------------------
 upload_stage() {
   local file="$1" schema="$2"
@@ -39,11 +66,24 @@ upload_stage() {
   [[ -f "$src_path" ]] || { echo "ERREUR : Fichier source manquant : $src_path"; exit 1; }
 
   echo "-> Upload : $file  =>  @$DATABASE.$schema.RAW_STAGE"
-  snowsql -c "$CONNECTION" \
-    -d "$DATABASE" \
-    -s "$schema" \
-    -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE AUTO_COMPRESS = FALSE;" \
-    --o quiet=true
+
+  if [[ -n "$CFG_ACCOUNT" && -n "$CFG_USER" ]]; then
+    SNOWSQL_PWD="$CFG_PASSWORD" snowsql \
+      -a "$CFG_ACCOUNT" \
+      -u "$CFG_USER" \
+      ${CFG_WAREHOUSE:+-w "$CFG_WAREHOUSE"} \
+      ${CFG_ROLE:+-r "$CFG_ROLE"} \
+      -d "$DATABASE" \
+      -s "$schema" \
+      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE AUTO_COMPRESS = FALSE;" \
+      -o quiet=true
+  else
+    snowsql -c "$CONNECTION" \
+      -d "$DATABASE" \
+      -s "$schema" \
+      -q "PUT file://$src_path @RAW_STAGE OVERWRITE = TRUE AUTO_COMPRESS = FALSE;" \
+      -o quiet=true
+  fi
 }
 
 # --- Upload des fichiers GDP --------------------------------------------------
