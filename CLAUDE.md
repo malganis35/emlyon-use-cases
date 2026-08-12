@@ -12,13 +12,10 @@ and `.sh`.
 
 ## Repository layout
 
-- `script/databricks/` — the pipeline, run in strict numeric order (01 → 04); see below.
-- `script/snowflake/` — currently empty; mirrors the Databricks pipeline if/when a Snowflake
-  variant is added.
-- `use_cases/` — raw source files for the two datasets (`gdp/`, `superstore/`, plus an unused
-  `allsales/`), consumed by `02_upload_files.sh` after manual export to CSV.
-- `src/emlyon_use_cases/` — minimal Python package stub (`main()` prints a greeting); not part of
-  the data pipeline.
+- `script/databricks/` — Databricks Free Edition pipeline, run in numeric order (01 → 04).
+- `script/snowflake/` — Snowflake pipeline, mirrors the Databricks pipeline (01 → 04).
+- `use_cases/` — raw source Excel and CSV files for the datasets (`gdp/`, `superstore/`).
+- `src/emlyon_use_cases/` — Python CLI tool (`uv run emlyon-use-cases prepare`) to convert `.xlsx` to `;`-delimited CSVs into `./data/`.
 
 ## The Databricks pipeline (`script/databricks/`)
 
