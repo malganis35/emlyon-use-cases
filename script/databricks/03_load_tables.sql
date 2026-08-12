@@ -272,7 +272,7 @@ ALTER TABLE allsales.fact_orders ADD CONSTRAINT fk_fact_orders_store FOREIGN KEY
 -- =============================================================================
 -- 4. CHECKS (all 7 rows should return expected volumes)
 -- =============================================================================
-SELECT 'gdp.fact_life_expectancy'    AS table_name, COUNT(*) AS rows, 12744 AS expected FROM gdp.fact_life_expectancy
+SELECT 'gdp.fact_life_expectancy'    AS table_name, COUNT(*) AS row_count, 12744 AS expected FROM gdp.fact_life_expectancy
 UNION ALL SELECT 'gdp.dim_continent',            COUNT(*),     3 FROM gdp.dim_continent
 UNION ALL SELECT 'superstore.fact_orders',       COUNT(*), 10000 FROM superstore.fact_orders
 UNION ALL SELECT 'superstore.dim_category',      COUNT(*),    17 FROM superstore.dim_category
