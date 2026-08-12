@@ -54,10 +54,10 @@ SELECT
   `Code`                                                   AS country_code,
   `Country`                                                AS country,
   `Continent`                                              AS continent,
-  CAST(`Year` AS INT)                                      AS year,
-  CAST(REPLACE(`GDP`, ',', '.') AS DOUBLE)                 AS gdp_per_capita,
-  CAST(REPLACE(`Life exp`, ',', '.') AS DOUBLE)            AS life_expectancy,
-  CAST(`Population` AS BIGINT)                             AS population
+  TRY_CAST(`Year` AS INT)                                  AS year,
+  TRY_CAST(REPLACE(`GDP`, ',', '.') AS DOUBLE)             AS gdp_per_capita,
+  TRY_CAST(REPLACE(`Life exp`, ',', '.') AS DOUBLE)        AS life_expectancy,
+  TRY_CAST(`Population` AS BIGINT)                         AS population
 FROM gdp.raw_life_expectancy;
 
 -- 1.4 CLEAN : dimension continent ---------------------------------------------
@@ -125,8 +125,8 @@ COMMENT 'Lignes de commande EU Superstore (1 ligne = 1 produit d''une commande).
 AS
 SELECT
   `Order ID`                                                        AS order_id,
-  CAST(try_to_timestamp(`Order Date`, 'dd/MM/yyyy') AS DATE)        AS order_date,
-  CAST(try_to_timestamp(`Ship Date`,  'dd/MM/yyyy') AS DATE)        AS ship_date,
+  TRY_CAST(try_to_timestamp(`Order Date`, 'dd/MM/yyyy') AS DATE)    AS order_date,
+  TRY_CAST(try_to_timestamp(`Ship Date`,  'dd/MM/yyyy') AS DATE)    AS ship_date,
   `Ship Mode`                                                       AS ship_mode,
   `Customer Name`                                                   AS customer_name,
   `Segment`                                                         AS segment,
@@ -137,10 +137,10 @@ SELECT
   `Manufacturer`                                                    AS manufacturer,
   `Product Name`                                                    AS product_name,
   `Sub-Category`                                                    AS sub_category,
-  CAST(REPLACE(`Quantity`, ',', '.') AS INT)                        AS quantity,
-  CAST(REPLACE(`Sales`,    ',', '.') AS DOUBLE)                     AS sales,
-  CAST(REPLACE(`Profit`,   ',', '.') AS DOUBLE)                     AS profit,
-  CAST(REPLACE(`Discount`, ',', '.') AS DOUBLE)                     AS discount,
+  TRY_CAST(REPLACE(`Quantity`, ',', '.') AS INT)                    AS quantity,
+  TRY_CAST(REPLACE(`Sales`,    ',', '.') AS DOUBLE)                 AS sales,
+  TRY_CAST(REPLACE(`Profit`,   ',', '.') AS DOUBLE)                 AS profit,
+  TRY_CAST(REPLACE(`Discount`, ',', '.') AS DOUBLE)                 AS discount,
   `_source_file`                                                    AS source_file
 FROM superstore.raw_orders;
 
