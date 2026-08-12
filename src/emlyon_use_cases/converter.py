@@ -50,7 +50,7 @@ def prepare_datasets(src_dir: Path, dst_dir: Path) -> list[Path]:
         ),
         (
             src_dir / "gdp" / "life-expectancy-vs-gdp-per-capita - cleaned.csv",
-            dst_dir / "life-expectancy-vs-gdp-per-capita_-_cleaned.csv",
+            dst_dir / "life_expectancy.csv",
             "csv",
         ),
         # Use Case Superstore
@@ -61,12 +61,12 @@ def prepare_datasets(src_dir: Path, dst_dir: Path) -> list[Path]:
         ),
         (
             src_dir / "superstore" / "Sample - EU Superstore_Migrated Data - Part 1.csv",
-            dst_dir / "Sample_-_EU_Superstore_Migrated_Data_-_Part_1.csv",
+            dst_dir / "superstore_part1.csv",
             "csv",
         ),
         (
             src_dir / "superstore" / "Sample - EU Superstore_Migrated Data - Part 2.csv",
-            dst_dir / "Sample_-_EU_Superstore_Migrated_Data_-_Part_2.csv",
+            dst_dir / "superstore_part2.csv",
             "csv",
         ),
     ]

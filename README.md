@@ -22,10 +22,10 @@ Ce dossier contient :
 
 ```
 data/
-├── life-expectancy-vs-gdp-per-capita_-_cleaned.csv
+├── life_expectancy.csv
 ├── continent_mapping.csv                              # converti depuis Mapping Table.xlsx
-├── Sample_-_EU_Superstore_Migrated_Data_-_Part_1.csv
-├── Sample_-_EU_Superstore_Migrated_Data_-_Part_2.csv
+├── superstore_part1.csv
+├── superstore_part2.csv
 └── nomenclature.csv                                   # converti depuis Nomenclature.xlsx
 ```
 
