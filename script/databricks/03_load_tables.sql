@@ -69,6 +69,7 @@ FROM gdp.raw_continent_mapping;
 
 ALTER TABLE gdp.dim_continent ALTER COLUMN continent SET NOT NULL;
 ALTER TABLE gdp.dim_continent ADD CONSTRAINT pk_dim_continent PRIMARY KEY (continent);
+ALTER TABLE gdp.fact_life_expectancy ADD CONSTRAINT fk_fact_life_expectancy_continent FOREIGN KEY (continent) REFERENCES gdp.dim_continent(continent) RELY DISABLE;
 
 -- 1.5 Commentaires de colonnes (repris automatiquement par Power BI) ----------
 ALTER TABLE gdp.fact_life_expectancy ALTER COLUMN country_code    COMMENT 'Code ISO-3 du pays';
@@ -153,6 +154,7 @@ FROM superstore.raw_nomenclature;
 
 ALTER TABLE superstore.dim_category ALTER COLUMN sub_category SET NOT NULL;
 ALTER TABLE superstore.dim_category ADD CONSTRAINT pk_dim_category PRIMARY KEY (sub_category);
+ALTER TABLE superstore.fact_orders ADD CONSTRAINT fk_fact_orders_category FOREIGN KEY (sub_category) REFERENCES superstore.dim_category(sub_category) RELY DISABLE;
 
 ALTER TABLE superstore.fact_orders ALTER COLUMN sales    COMMENT 'Chiffre d''affaires de la ligne, EUR';
 ALTER TABLE superstore.fact_orders ALTER COLUMN profit   COMMENT 'Marge de la ligne, EUR';
