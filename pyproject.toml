@@ -1,0 +1,17 @@
+[project]
+name = "emlyon-use-cases"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Cao Tri DO", email = "caotri.do88@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+emlyon-use-cases = "emlyon_use_cases:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
