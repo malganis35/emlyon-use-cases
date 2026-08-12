@@ -12,13 +12,17 @@ This step-by-step guide is designed to allow any instructor or TA to deploy the 
 
 ## 📋 Table of Contents
 
-- [1. Prerequisites & Local Setup](#1-prerequisites--local-setup)
-- [2. Step 1: Raw Data Preparation](#2-step-1-raw-data-preparation)
-- [3. Databricks Free Edition Deployment](#3-databricks-free-edition-deployment)
-- [4. Snowflake Deployment](#4-snowflake-deployment)
-- [5. 🔑 Student Connection Cheatsheets (Power BI / Tableau)](#5--student-connection-cheatsheets-power-bi--tableau)
-- [6. 🎯 Pedagogical Data Traps](#6--pedagogical-data-traps)
-- [7. 🧹 Inter-Cohort Reset Procedure](#7--inter-cohort-reset-procedure)
+- [🎓 Deployment Guide — Databricks \& Snowflake for BI \& DataViz Courses](#-deployment-guide--databricks--snowflake-for-bi--dataviz-courses)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [1. Prerequisites \& Local Setup](#1-prerequisites--local-setup)
+  - [2. Step 1: Raw Data Preparation](#2-step-1-raw-data-preparation)
+  - [3. Databricks Free Edition Deployment](#3-databricks-free-edition-deployment)
+  - [4. Snowflake Deployment](#4-snowflake-deployment)
+  - [5. 🔑 Student Connection Cheatsheets (Power BI / Tableau)](#5--student-connection-cheatsheets-power-bi--tableau)
+    - [Option A: Databricks Connection](#option-a-databricks-connection)
+    - [Option B: Snowflake Connection](#option-b-snowflake-connection)
+  - [6. 🎯 Pedagogical Data Traps](#6--pedagogical-data-traps)
+  - [7. 🧹 Inter-Cohort Reset Procedure](#7--inter-cohort-reset-procedure)
 
 ---
 
@@ -138,3 +142,5 @@ The datasets intentionally contain **deliberate data quality issues** that shoul
 
 - **Databricks**: Run `DROP CATALOG IF EXISTS emlyon_use_cases CASCADE;` via [`script/databricks/99_reset.sql`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/databricks/99_reset.sql).
 - **Snowflake**: Run [`script/snowflake/99_reset.sql`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/snowflake/99_reset.sql).
+
+*note: Project made with Claude Code and Google Gemini*
