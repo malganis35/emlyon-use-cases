@@ -129,6 +129,16 @@ Invocation explicite possible : `/pr-description`.
 
 ---
 
+## `skills/setup-instructeur/SKILL.md` — setup de la machine instructeur
+
+Vérifie uv, Node/npm, git, la CLI Databricks et `snowsql`, puis teste les connexions
+Databricks et Snowflake avec des commandes en lecture seule. Elle demande confirmation
+avant toute installation et n'affiche jamais de mot de passe.
+
+Invocation explicite possible : `/setup-instructeur`.
+
+---
+
 ## Serveurs MCP
 
 Aucun `.mcp.json` n'est fourni pour ce projet. Pour en ajouter un, crée `.mcp.json`

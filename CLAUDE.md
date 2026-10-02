@@ -12,6 +12,7 @@ Pedagogical data pipeline for emlyon Business School BI & DataViz courses (Power
 - Upload to Snowflake stages: `bash script/snowflake/02_upload_files.sh ./data` (connection from `$SNOWSQL_CONN`, default `emlyon`, read from `~/.snowflake/connections.toml`)
 - The `01_`, `03_`, `04_` and `99_` SQL scripts run manually in the Databricks SQL Editor or Snowsight, in numeric order. `03_load_tables.sql` ends with a row-count check query that compares each table to its expected count.
 
+- Check or prepare an instructor machine (uv, Node, git, Databricks and Snowflake CLIs and connections): run the `/setup-instructeur` skill.
 - Lint / format Python: `uv run ruff check src/` and `uv run ruff format src/`. Ruff is a dev dependency, and a `.claude/` PostToolUse hook runs it automatically on every `.py` file Claude edits.
 
 There is no test suite or CI.
