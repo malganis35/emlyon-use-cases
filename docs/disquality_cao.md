@@ -7,3 +7,5 @@
 - Add rows at the beginning with one column equal to zz_test and nothing in the other column to teach student how to delete the first rows
 - Add 2 columns with null value to teach to students to delete columns
 - Add a prefix to all the data in a column, for example "Sales Channel: " to to teach to students to replace values
+- Prefix a column with 1- or 2- or 11-, etc. so that the students have to split a column by a separator
+- Have numeric columns with . and , separator to teach to students to use local settings (US or FR) to transform to decimal number
