@@ -1,0 +1,15 @@
+use_case: retail
+seed: 1
+tables:
+  - name: sales_part1
+    source: sales.csv
+    rows: [0, 3]
+    disqualities:
+      - {type: junk_rows, column: Order ID, count: 2}
+      - {type: null_columns, names: [Empty 1, Empty 2]}
+      - {type: value_prefix, column: Channel, prefix: "Sales Channel: "}
+      - {type: code_prefix, column: Product}
+      - {type: mixed_decimal, column: Price, ratio: 0.5}
+  - name: sales_part2
+    source: sales.csv
+    rows: [3, 6]
