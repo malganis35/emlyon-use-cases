@@ -11,3 +11,5 @@ wheels/
 
 # Staging Data
 data/
+# Claude Code personal settings
+.claude/settings.local.json

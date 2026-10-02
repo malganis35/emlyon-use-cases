@@ -1,6 +1,7 @@
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from emlyon_use_cases.converter import prepare_datasets
 
 
@@ -35,7 +36,7 @@ def main() -> None:
     if args.command is None or args.command == "prepare":
         src_dir = getattr(args, "src", Path("./use_cases"))
         dst_dir = getattr(args, "dst", Path("./data"))
-        print(f"=== emlyon Dataset Preparation ===")
+        print("=== emlyon Dataset Preparation ===")
         print(f"Source      : {src_dir}")
         print(f"Destination : {dst_dir}")
         print()
