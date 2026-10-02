@@ -19,13 +19,11 @@ There is no test suite or CI.
 
 ## Architecture
 - **Python CLI** (`src/emlyon_use_cases/`): `converter.prepare_datasets()` holds a hardcoded `mappings` list of (source path, output CSV, `xlsx`|`csv`, sheet name). XLSX sheets are exported with `openpyxl` (`data_only=True`, empty rows skipped). CSV sources are copied with the UTF-8 BOM removed and CRLF converted to LF. The Databricks upload script normalizes BOM and CRLF a second time with `sed`.
-- **Two layers per warehouse**, built in `03_load_tables.sql`:
-  - `raw_*`: every column is a STRING. Databricks keeps the original column names; Snowflake uses snake_case uppercase names.
-  - `fact_*` / `dim_*`: typed and renamed to snake_case, with PK/FK constraints and column comments. Values are deliberately left uncleaned.
+- **One layer per warehouse: 1 CSV = 1 table**, built in `03_load_tables.sql` (9 tables: `life_expectancy`, `continent_mapping`, `superstore_part1`, `superstore_part2`, `nomenclature`, `allsales_part1`, `allsales_part2`, `allsales_team`, `allsales_store`). Every column is a STRING, **all** CSV columns are kept, with no union, no rename, no cast and no constraints, so students get the same data as the CSVs and preprocess it themselves. Databricks keeps the original column names; Snowflake uses snake_case uppercase names. Each `03_` script starts with `DROP TABLE IF EXISTS` for the legacy `raw_*` / `fact_*` / `dim_*` tables.
 - **Platform loading differs. Watch for this when editing:**
-  - Databricks uses `read_files(..., header => true)` and selects columns **by header name**, so column order in the CSV doesn't matter.
-  - Snowflake uses `COPY INTO` with `SKIP_HEADER = 1` and selects columns **by position** (`$1..$N`). For example, the Excel exports `allsales_team.csv` and `allsales_store.csv` have an unnamed first column and extra columns, so their positional selects skip those columns. Any change to a source file's column order or set must be mirrored in the Snowflake positional selects.
-  - Superstore part1 and part2 have different column orders (the "union by name" trap). Databricks unions them by name. Snowflake loads both with the same positional mapping.
+  - Databricks uses `SELECT * FROM read_files(..., header => true, inferColumnTypes => false)`, so column order and names come from the CSV header (an empty header becomes `_c0`).
+  - Snowflake uses `COPY INTO` straight into tables with `SKIP_HEADER = 1`, loading columns **by position** in file order. Any change to a source file's column order or set must be mirrored in the Snowflake `CREATE TABLE` column lists (including the unnamed first column of `allsales_team.csv` and `allsales_store.csv`, named `COLUMN_1`).
+  - Superstore part1 and part2 have different column orders (the "union by name" trap). They are two separate tables on both platforms, and each Snowflake table follows its own file's order.
 - **Naming**: Databricks uses lowercase schemas `gdp`, `superstore`, `allsales` in catalog `emlyon_use_cases`, with a `raw_files` volume per schema. Snowflake uses uppercase `GDP`/`SUPERSTORE`/`ALLSALES` in `EMLYON_USE_CASES`, with an `@RAW_STAGE` stage and a `CSV_FORMAT_SEMICOLON` file format per schema, on warehouse `EMLYON_WH`.
 
 ### Adding or changing a dataset
@@ -33,7 +31,7 @@ The file list is duplicated in several places, so update all of them together:
 - the `mappings` list in `converter.py`
 - the file lists in both `02_upload_files.sh` scripts
 - the schema, volume or stage setup in both `01_` scripts (only for a new use case)
-- the raw table, typed table and row-count check in both `03_load_tables.sql` scripts
+- the table and row-count check in both `03_load_tables.sql` scripts
 - the grants in both `04_` scripts (only for a new schema)
 - the hardcoded "9 files" messages and the README file list and traps table
 
@@ -41,5 +39,5 @@ The file list is duplicated in several places, so update all of them together:
 1. **Pedagogical traps**: Do NOT clean intentional raw-data anomalies in SQL. These include the incomplete continent mapping (Europe, Asia, Mars), decimal commas, prefixed categories (`1-Office Supplies`), junk columns (`Remove Inc ?`), and the differing Superstore column orders. They are student exercises; the README "Pedagogical Data Traps" table lists them.
 2. **Read-only BI permissions**: Student principals (Databricks service principal `db-invite-bi`; Snowflake `BI_STUDENT_ROLE` / `STUDENT_BI_USER`) must never get WRITE, CREATE, or MODIFY privileges.
 3. **Idempotence**: Every SQL statement must use `IF NOT EXISTS` or `CREATE OR REPLACE` so scripts can be re-run safely.
-4. **ANSI safety**: Cast dirty strings with `TRY_CAST`, `TRY_TO_DATE` (Snowflake) or `try_to_timestamp` (Databricks), never with a plain cast.
+4. **No transformation in SQL**: Tables load the CSV values as is (STRING). Do not add casts, unions, renames or constraints; typing and cleaning are student exercises.
 5. **Keep platforms in sync**: Any table, column, or expected row count changed on one platform must be changed identically on the other.

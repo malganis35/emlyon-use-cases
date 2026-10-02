@@ -45,7 +45,7 @@ Run the project's Python CLI to convert Excel sheets to `;`-delimited CSVs, stri
 uv run emlyon-use-cases prepare
 ```
 
-**Generated files in `./data/` (9 total)**:
+**Generated files in `./data/` (9 total, each loaded as one table of the same name)**:
 - **GDP**: `life_expectancy.csv`, `continent_mapping.csv`
 - **Superstore**: `superstore_part1.csv`, `superstore_part2.csv`, `nomenclature.csv`
 - **Allsales**: `allsales_part1.csv`, `allsales_part2.csv`, `allsales_team.csv`, `allsales_store.csv`
@@ -61,7 +61,7 @@ Execution order in [`script/databricks/`](file:///home/ctdo/emlyon/project/emlyo
    ```bash
    bash script/databricks/02_upload_files.sh ./data
    ```
-3. **`03_load_tables.sql`** (Databricks SQL Editor): Creates `raw_*` tables and typed `fact_*` / `dim_*` tables with PK/FK constraints.
+3. **`03_load_tables.sql`** (Databricks SQL Editor): Creates the 9 tables, one per CSV, as is (all columns STRING, no union, no cleaning).
 4. **`04_grants_bi.sql`** (Databricks SQL Editor): Configures read-only access for the `db-invite-bi` Service Principal.
 
 ---
@@ -80,7 +80,7 @@ Execution order in [`script/snowflake/`](file:///home/ctdo/emlyon/project/emlyon
    *Uploads all 9 CSV files into Snowflake internal stages via `snowsql` batch mode.*
 3. **`03_load_tables.sql`** (Snowsight UI):
    - Ingests stage CSV files via `COPY INTO`.
-   - Creates `RAW_*` tables and typed `FACT_*` / `DIM_*` tables with PK/FK constraints.
+   - Creates the 9 tables, one per CSV, as is (all columns STRING, no union, no cleaning).
 4. **`04_grants_bi.sql`** (Snowsight UI):
    - Replace `<<STUDENT_PASSWORD>>` with your workshop password.
    - Creates read-only role `BI_STUDENT_ROLE` and user `STUDENT_BI_USER`.
@@ -126,10 +126,10 @@ The datasets intentionally contain **deliberate data quality issues** that shoul
 | :--- | :--- | :--- |
 | **GDP** | Continent reference table limited to `Europe`, `Asia`, `Mars`. | Outer joins practice (Left Outer Join) and orphan values handling. |
 | **GDP** | Decimal commas in `Life exp`. | Data conversion and data typing at import. |
-| **Superstore** | `part1` and `part2` CSVs have different column orders. | Union by column name (Union by Name). |
+| **Superstore** | `superstore_part1` and `superstore_part2` tables have different column orders. | Union by column name (Union by Name). |
 | **Superstore** | Junk columns `Remove Inc ?` and `Remove Inc 2?` filled with `?`. | Data model hygiene by discarding irrelevant columns. |
 | **Superstore** | Prefixed categories (`1-Office Supplies`, `10-Technology`, `100-Furniture`). | String extraction (Split / Text Parsing) and custom sorting. |
-| **Allsales** | Multi-year order batches (`2025` part 1 & `2026` part 2) with 40,000 transactions. | Star-schema modeling (`fact_orders` linked to `dim_sales_team` & `dim_store`), calculated metrics (`sales_amount`, `cost_amount`, `profit_amount`). |
+| **Allsales** | Multi-year order batches (`allsales_part1` 2025 & `allsales_part2` 2026) with 40,000 transactions. `allsales_team` / `allsales_store` have an unnamed first column and extra columns. | Append the 2 batches, star-schema modeling (orders linked to `allsales_team` & `allsales_store`), typing, calculated metrics (sales, cost, profit amounts). |
 
 ---
 

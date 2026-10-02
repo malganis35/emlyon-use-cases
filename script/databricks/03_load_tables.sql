@@ -1,281 +1,154 @@
 -- =============================================================================
 -- 03_load_tables.sql
--- Object : Loads the 9 volume files into Delta tables across 3 use cases
---          RAW Layer   = all STRING, original column names (for student exercises)
---          CLEAN Layer = proper types, snake_case names, UNCLEANED VALUES (by design)
--- Idempotent : Yes (CREATE OR REPLACE)
--- Duration : ~2-3 minutes on 2X-Small SQL Warehouse
+-- Object : Loads the 9 volume files into 9 Delta tables, strictly 1 CSV = 1 table
+--          Every column is STRING (explicit schema: no inference, no _rescued_data),
+--          original column names, ALL columns kept (unnamed header = _c0),
+--          no union, no rename, no cast, no constraints.
+--          Students pre-process the data themselves (Power Query / Tableau Prep).
+-- Idempotent : Yes (CREATE OR REPLACE / DROP TABLE IF EXISTS)
+-- Duration : ~1-2 minutes on 2X-Small SQL Warehouse
 -- =============================================================================
 
 USE CATALOG emlyon_use_cases;
 
 -- =============================================================================
+-- 0. LEGACY CLEANUP (previous raw_* / fact_* / dim_* layers)
+-- =============================================================================
+DROP TABLE IF EXISTS gdp.fact_life_expectancy;
+DROP TABLE IF EXISTS gdp.dim_continent;
+DROP TABLE IF EXISTS gdp.raw_life_expectancy;
+DROP TABLE IF EXISTS gdp.raw_continent_mapping;
+DROP TABLE IF EXISTS superstore.fact_orders;
+DROP TABLE IF EXISTS superstore.dim_category;
+DROP TABLE IF EXISTS superstore.raw_orders;
+DROP TABLE IF EXISTS superstore.raw_nomenclature;
+DROP TABLE IF EXISTS allsales.fact_orders;
+DROP TABLE IF EXISTS allsales.dim_sales_team;
+DROP TABLE IF EXISTS allsales.dim_store;
+DROP TABLE IF EXISTS allsales.raw_orders;
+DROP TABLE IF EXISTS allsales.raw_team;
+DROP TABLE IF EXISTS allsales.raw_store;
+
+-- =============================================================================
 -- USE CASE 1 : GDP
 -- =============================================================================
 
--- 1.1 RAW : Life Expectancy vs GDP (12,744 rows expected) --------------------
-CREATE OR REPLACE TABLE gdp.raw_life_expectancy
+-- 1.1 Life Expectancy vs GDP (12,744 rows expected) ---------------------------
+CREATE OR REPLACE TABLE gdp.life_expectancy
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Raw source Our World in Data. Decimal commas on Life exp, empty Annotations column.'
+COMMENT 'Source file life_expectancy.csv, as is. Decimal commas on Life exp, empty Annotations column.'
 AS
-SELECT
-  `Code`,
-  `Continent`,
-  `Country`,
-  `GDP per capita (Annotations)`,
-  `Year`,
-  `GDP`,
-  `Life exp`,
-  `Population`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/gdp/raw_files/life_expectancy.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Code` STRING, `Continent` STRING, `Country` STRING, `GDP per capita (Annotations)` STRING, `Year` STRING, `GDP` STRING, `Life exp` STRING, `Population` STRING'
 );
 
--- 1.2 RAW : Continent mapping reference table (3 rows expected) ---------------
-CREATE OR REPLACE TABLE gdp.raw_continent_mapping
+-- 1.2 Continent mapping (3 rows expected) -------------------------------------
+CREATE OR REPLACE TABLE gdp.continent_mapping
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Continent reference table INTENTIONALLY INCOMPLETE (Europe, Asia, Mars).'
+COMMENT 'Source file continent_mapping.csv, as is. INTENTIONALLY INCOMPLETE (Europe, Asia, Mars).'
 AS
-SELECT `Continent`, `Code Continent`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/gdp/raw_files/continent_mapping.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Continent` STRING, `Code Continent` STRING'
 );
-
--- 1.3 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE gdp.fact_life_expectancy
-COMMENT 'Life expectancy and GDP per capita, per country and per year.'
-AS
-SELECT
-  `Code`                                                   AS country_code,
-  `Country`                                                AS country,
-  `Continent`                                              AS continent,
-  TRY_CAST(`Year` AS INT)                                  AS year,
-  TRY_CAST(REPLACE(`GDP`, ',', '.') AS DOUBLE)             AS gdp_per_capita,
-  TRY_CAST(REPLACE(`Life exp`, ',', '.') AS DOUBLE)        AS life_expectancy,
-  TRY_CAST(`Population` AS BIGINT)                         AS population
-FROM gdp.raw_life_expectancy;
-
--- 1.4 CLEAN : Continent dimension ---------------------------------------------
-CREATE OR REPLACE TABLE gdp.dim_continent
-COMMENT 'Continent reference dimension (partially complete by pedagogical design).'
-AS
-SELECT `Continent` AS continent, `Code Continent` AS continent_code
-FROM gdp.raw_continent_mapping;
-
-ALTER TABLE gdp.dim_continent ALTER COLUMN continent SET NOT NULL;
-ALTER TABLE gdp.dim_continent ADD CONSTRAINT pk_dim_continent PRIMARY KEY (continent);
-ALTER TABLE gdp.fact_life_expectancy ADD CONSTRAINT fk_fact_life_expectancy_continent FOREIGN KEY (continent) REFERENCES gdp.dim_continent(continent);
-
-ALTER TABLE gdp.fact_life_expectancy ALTER COLUMN country_code    COMMENT 'ISO-3 country code';
-ALTER TABLE gdp.fact_life_expectancy ALTER COLUMN gdp_per_capita  COMMENT 'GDP per capita, constant USD';
-ALTER TABLE gdp.fact_life_expectancy ALTER COLUMN life_expectancy COMMENT 'Life expectancy at birth, in years';
-ALTER TABLE gdp.fact_life_expectancy ALTER COLUMN population      COMMENT 'Total country population';
-ALTER TABLE gdp.dim_continent        ALTER COLUMN continent_code  COMMENT 'Short continent code (partial reference table)';
 
 -- =============================================================================
 -- USE CASE 2 : SUPERSTORE
 -- =============================================================================
 
--- 2.1 RAW : Union of the 2 migration batches (3,895 + 6,105 = 10,000 rows expected)
-CREATE OR REPLACE TABLE superstore.raw_orders
+-- 2.1 Migration batch 1 (3,895 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE superstore.superstore_part1
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'EU Superstore orders, union of 2 migration batches.'
+COMMENT 'Source file superstore_part1.csv, as is. Column order differs from part2.'
 AS
-SELECT
-  'part1' AS `_source_file`,
-  `City`, `Country/Region`, `Customer Name`, `Manufacturer`, `Order Date`, `Order ID`,
-  `Product Name`, `Remove Inc ?`, `Remove Inc 2?`, `Region`, `Segment`, `Ship Date`,
-  `Ship Mode`, `State/Province`, `Sub-Category`, `Discount`, `Profit`, `Quantity`, `Sales`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/superstore/raw_files/superstore_part1.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
-)
-UNION ALL
-SELECT
-  'part2' AS `_source_file`,
-  `City`, `Country/Region`, `Customer Name`, `Manufacturer`, `Order Date`, `Order ID`,
-  `Product Name`, `Remove Inc ?`, `Remove Inc 2?`, `Region`, `Segment`, `Ship Date`,
-  `Ship Mode`, `State/Province`, `Sub-Category`, `Discount`, `Profit`, `Quantity`, `Sales`
-FROM read_files(
-  '/Volumes/emlyon_use_cases/superstore/raw_files/superstore_part2.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`City` STRING, `Country/Region` STRING, `Customer Name` STRING, `Manufacturer` STRING, `Order Date` STRING, `Order ID` STRING, `Product Name` STRING, `Remove Inc ?` STRING, `Remove Inc 2?` STRING, `Region` STRING, `Segment` STRING, `Ship Date` STRING, `Ship Mode` STRING, `State/Province` STRING, `Sub-Category` STRING, `Discount` STRING, `Profit` STRING, `Quantity` STRING, `Sales` STRING'
 );
 
--- 2.2 RAW : Category nomenclature (17 rows expected) --------------------------
-CREATE OR REPLACE TABLE superstore.raw_nomenclature
+-- 2.2 Migration batch 2 (6,105 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE superstore.superstore_part2
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Category / Sub-Category nomenclature.'
+COMMENT 'Source file superstore_part2.csv, as is. Column order differs from part1.'
 AS
-SELECT `Category`, `Sub-Category`
-FROM read_files(
-  '/Volumes/emlyon_use_cases/superstore/raw_files/nomenclature.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+SELECT * FROM read_files(
+  '/Volumes/emlyon_use_cases/superstore/raw_files/superstore_part2.csv',
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Country/Region` STRING, `City` STRING, `Customer Name` STRING, `Manufacturer` STRING, `Order Date` STRING, `Order ID` STRING, `Product Name` STRING, `Region` STRING, `Remove Inc ?` STRING, `Remove Inc 2?` STRING, `Segment` STRING, `Ship Date` STRING, `Ship Mode` STRING, `State/Province` STRING, `Sub-Category` STRING, `Discount` STRING, `Profit` STRING, `Quantity` STRING, `Sales` STRING'
 );
 
--- 2.3 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE superstore.fact_orders
-COMMENT 'EU Superstore order line items (1 row = 1 product in an order).'
+-- 2.3 Category nomenclature (17 rows expected) --------------------------------
+CREATE OR REPLACE TABLE superstore.nomenclature
+TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
+COMMENT 'Source file nomenclature.csv, as is. Prefixed categories (1-Office Supplies).'
 AS
-SELECT
-  `Order ID`                                                        AS order_id,
-  TRY_CAST(try_to_timestamp(`Order Date`, 'dd/MM/yyyy') AS DATE)    AS order_date,
-  TRY_CAST(try_to_timestamp(`Ship Date`,  'dd/MM/yyyy') AS DATE)    AS ship_date,
-  `Ship Mode`                                                       AS ship_mode,
-  `Customer Name`                                                   AS customer_name,
-  `Segment`                                                         AS segment,
-  `Country/Region`                                                  AS country,
-  `State/Province`                                                  AS state_province,
-  `City`                                                            AS city,
-  `Region`                                                          AS region,
-  `Manufacturer`                                                    AS manufacturer,
-  `Product Name`                                                    AS product_name,
-  `Sub-Category`                                                    AS sub_category,
-  TRY_CAST(REPLACE(`Quantity`, ',', '.') AS INT)                    AS quantity,
-  TRY_CAST(REPLACE(`Sales`,    ',', '.') AS DOUBLE)                 AS sales,
-  TRY_CAST(REPLACE(`Profit`,   ',', '.') AS DOUBLE)                 AS profit,
-  TRY_CAST(REPLACE(`Discount`, ',', '.') AS DOUBLE)                 AS discount,
-  `_source_file`                                                    AS source_file
-FROM superstore.raw_orders;
-
--- 2.4 CLEAN : Category dimension ----------------------------------------------
-CREATE OR REPLACE TABLE superstore.dim_category
-COMMENT 'Category dimension.'
-AS
-SELECT `Sub-Category` AS sub_category, `Category` AS category
-FROM superstore.raw_nomenclature;
-
-ALTER TABLE superstore.dim_category ALTER COLUMN sub_category SET NOT NULL;
-ALTER TABLE superstore.dim_category ADD CONSTRAINT pk_dim_category PRIMARY KEY (sub_category);
-ALTER TABLE superstore.fact_orders ADD CONSTRAINT fk_fact_orders_category FOREIGN KEY (sub_category) REFERENCES superstore.dim_category(sub_category);
-
-ALTER TABLE superstore.fact_orders ALTER COLUMN sales       COMMENT 'Line item sales revenue, EUR';
-ALTER TABLE superstore.fact_orders ALTER COLUMN profit      COMMENT 'Line item profit margin, EUR';
-ALTER TABLE superstore.fact_orders ALTER COLUMN discount    COMMENT 'Applied discount rate (0 to 1)';
-ALTER TABLE superstore.fact_orders ALTER COLUMN source_file COMMENT 'Original migration batch: part1 or part2';
+SELECT * FROM read_files(
+  '/Volumes/emlyon_use_cases/superstore/raw_files/nomenclature.csv',
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Category` STRING, `Sub-Category` STRING'
+);
 
 -- =============================================================================
 -- USE CASE 3 : ALLSALES
 -- =============================================================================
 
--- 3.1 RAW : Union of the 2 sales batches (20,000 + 20,000 = 40,000 rows expected)
-CREATE OR REPLACE TABLE allsales.raw_orders
+-- 3.1 Sales batch 2025 (20,000 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE allsales.allsales_part1
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Global sales transactions, union of 2025 and 2026 batches.'
+COMMENT 'Source file allsales_part1.csv, as is (2025 batch).'
 AS
-SELECT
-  'part1' AS `_source_file`,
-  `Order Number`, `Source`, `Company`, `Sales Date`, `Sales Channel`, `Currency`,
-  `SalesAgentID`, `StoreID`, `Product`, `Order qty`, `unit price`, `unit cost`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/allsales/raw_files/allsales_part1.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
-)
-UNION ALL
-SELECT
-  'part2' AS `_source_file`,
-  `Order Number`, `Source`, `Company`, `Sales Date`, `Sales Channel`, `Currency`,
-  `SalesAgentID`, `StoreID`, `Product`, `Order qty`, `unit price`, `unit cost`
-FROM read_files(
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Order Number` STRING, `Source` STRING, `Company` STRING, `Sales Date` STRING, `Sales Channel` STRING, `Currency` STRING, `SalesAgentID` STRING, `StoreID` STRING, `Product` STRING, `Order qty` STRING, `unit price` STRING, `unit cost` STRING'
+);
+
+-- 3.2 Sales batch 2026 (20,000 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE allsales.allsales_part2
+TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
+COMMENT 'Source file allsales_part2.csv, as is (2026 batch).'
+AS
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/allsales/raw_files/allsales_part2.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`Order Number` STRING, `Source` STRING, `Company` STRING, `Sales Date` STRING, `Sales Channel` STRING, `Currency` STRING, `SalesAgentID` STRING, `StoreID` STRING, `Product` STRING, `Order qty` STRING, `unit price` STRING, `unit cost` STRING'
 );
 
--- 3.2 RAW : Sales team reference table (31 rows expected) --------------------
-CREATE OR REPLACE TABLE allsales.raw_team
+-- 3.3 Sales team (31 rows expected) -------------------------------------------
+CREATE OR REPLACE TABLE allsales.allsales_team
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Sales agents reference table.'
+COMMENT 'Source file allsales_team.csv, as is. Unnamed first column (_c0).'
 AS
-SELECT `Index`, `Sales Team`, `Region`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/allsales/raw_files/allsales_team.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`_c0` STRING, `Index` STRING, `Sales Team` STRING, `Region` STRING'
 );
 
--- 3.3 RAW : Store locations reference table (367 rows expected) ---------------
-CREATE OR REPLACE TABLE allsales.raw_store
+-- 3.4 Store locations (367 rows expected) -------------------------------------
+CREATE OR REPLACE TABLE allsales.allsales_store
 TBLPROPERTIES ('delta.columnMapping.mode' = 'name')
-COMMENT 'Store locations and demographic metadata.'
+COMMENT 'Source file allsales_store.csv, as is. Unnamed first column (_c0) and extra columns.'
 AS
-SELECT
-  `id`, `name`, `county`, `region`, `state_code`, `state`, `type`,
-  `latitude`, `longitude`, `area_code`, `population`, `households`,
-  `median_income`, `land_area`
-FROM read_files(
+SELECT * FROM read_files(
   '/Volumes/emlyon_use_cases/allsales/raw_files/allsales_store.csv',
-  format => 'csv', sep => ';', header => true, encoding => 'UTF-8'
+  format => 'csv', sep => ';', header => true, encoding => 'UTF-8',
+  schema => '`_c0` STRING, `id` STRING, `name` STRING, `Colonne1` STRING, `county` STRING, `region` STRING, `state_code` STRING, `state` STRING, `type` STRING, `latitude` STRING, `longitude` STRING, `area_code` STRING, `population` STRING, `households` STRING, `median_income` STRING, `land_area` STRING, `water_area` STRING, `time_zone` STRING, `state_geo` STRING'
 );
 
--- 3.4 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE allsales.fact_orders
-COMMENT 'Sales order line items with calculated sales, cost, and profit amounts.'
-AS
-SELECT
-  `Order Number`                                                    AS order_number,
-  TRY_CAST(try_to_timestamp(`Sales Date`, 'yyyy-MM-dd HH:mm:ss') AS DATE) AS sales_date,
-  `Sales Channel`                                                   AS sales_channel,
-  `Company`                                                         AS company,
-  `Currency`                                                        AS currency,
-  TRY_CAST(`SalesAgentID` AS INT)                                   AS sales_agent_id,
-  TRY_CAST(`StoreID` AS INT)                                        AS store_id,
-  `Product`                                                         AS product,
-  TRY_CAST(REPLACE(`Order qty`, ',', '.') AS INT)                   AS order_quantity,
-  TRY_CAST(REPLACE(`unit price`, ',', '.') AS DOUBLE)              AS unit_price,
-  TRY_CAST(REPLACE(`unit cost`,  ',', '.') AS DOUBLE)              AS unit_cost,
-  TRY_CAST(REPLACE(`Order qty`, ',', '.') AS INT) * TRY_CAST(REPLACE(`unit price`, ',', '.') AS DOUBLE) AS sales_amount,
-  TRY_CAST(REPLACE(`Order qty`, ',', '.') AS INT) * TRY_CAST(REPLACE(`unit cost`,  ',', '.') AS DOUBLE) AS cost_amount,
-  (TRY_CAST(REPLACE(`Order qty`, ',', '.') AS INT) * TRY_CAST(REPLACE(`unit price`, ',', '.') AS DOUBLE)) - 
-  (TRY_CAST(REPLACE(`Order qty`, ',', '.') AS INT) * TRY_CAST(REPLACE(`unit cost`,  ',', '.') AS DOUBLE)) AS profit_amount,
-  `_source_file`                                                    AS source_file
-FROM allsales.raw_orders;
-
--- 3.5 CLEAN : Typed dimension tables ------------------------------------------
-CREATE OR REPLACE TABLE allsales.dim_sales_team
-COMMENT 'Sales team dimension.'
-AS
-SELECT
-  TRY_CAST(`Index` AS INT) AS sales_agent_id,
-  `Sales Team`             AS sales_team_name,
-  `Region`                 AS sales_region
-FROM allsales.raw_team;
-
-ALTER TABLE allsales.dim_sales_team ALTER COLUMN sales_agent_id SET NOT NULL;
-ALTER TABLE allsales.dim_sales_team ADD CONSTRAINT pk_dim_sales_team PRIMARY KEY (sales_agent_id);
-
-CREATE OR REPLACE TABLE allsales.dim_store
-COMMENT 'Store locations dimension.'
-AS
-SELECT
-  TRY_CAST(`id` AS INT)                                      AS store_id,
-  `name`                                                     AS store_name,
-  `county`                                                   AS county,
-  `region`                                                   AS region,
-  `state_code`                                               AS state_code,
-  `state`                                                    AS state,
-  `type`                                                     AS store_type,
-  TRY_CAST(REPLACE(`latitude`, ',', '.') AS DOUBLE)          AS latitude,
-  TRY_CAST(REPLACE(`longitude`, ',', '.') AS DOUBLE)         AS longitude,
-  TRY_CAST(`area_code` AS INT)                               AS area_code,
-  TRY_CAST(REPLACE(`population`, ',', '.') AS BIGINT)        AS population,
-  TRY_CAST(REPLACE(`households`, ',', '.') AS BIGINT)        AS households,
-  TRY_CAST(REPLACE(`median_income`, ',', '.') AS DOUBLE)     AS median_income,
-  TRY_CAST(REPLACE(`land_area`, ',', '.') AS DOUBLE)         AS land_area
-FROM allsales.raw_store;
-
-ALTER TABLE allsales.dim_store ALTER COLUMN store_id SET NOT NULL;
-ALTER TABLE allsales.dim_store ADD CONSTRAINT pk_dim_store PRIMARY KEY (store_id);
-
-ALTER TABLE allsales.fact_orders ADD CONSTRAINT fk_fact_orders_sales_agent FOREIGN KEY (sales_agent_id) REFERENCES allsales.dim_sales_team(sales_agent_id);
-ALTER TABLE allsales.fact_orders ADD CONSTRAINT fk_fact_orders_store FOREIGN KEY (store_id) REFERENCES allsales.dim_store(store_id);
-
 -- =============================================================================
--- 4. CHECKS (all 7 rows should return expected volumes)
+-- 4. CHECKS (all 9 rows should return expected volumes)
 -- =============================================================================
-SELECT 'gdp.fact_life_expectancy'    AS table_name, COUNT(*) AS row_count, 12744 AS expected FROM gdp.fact_life_expectancy
-UNION ALL SELECT 'gdp.dim_continent',            COUNT(*),     3 FROM gdp.dim_continent
-UNION ALL SELECT 'superstore.fact_orders',       COUNT(*), 10000 FROM superstore.fact_orders
-UNION ALL SELECT 'superstore.dim_category',      COUNT(*),    17 FROM superstore.dim_category
-UNION ALL SELECT 'allsales.fact_orders',         COUNT(*), 40000 FROM allsales.fact_orders
-UNION ALL SELECT 'allsales.dim_sales_team',      COUNT(*),    31 FROM allsales.dim_sales_team
-UNION ALL SELECT 'allsales.dim_store',           COUNT(*),   367 FROM allsales.dim_store;
+SELECT 'gdp.life_expectancy'         AS table_name, COUNT(*) AS row_count, 12744 AS expected FROM gdp.life_expectancy
+UNION ALL SELECT 'gdp.continent_mapping',        COUNT(*),     3 FROM gdp.continent_mapping
+UNION ALL SELECT 'superstore.superstore_part1',  COUNT(*),  3895 FROM superstore.superstore_part1
+UNION ALL SELECT 'superstore.superstore_part2',  COUNT(*),  6105 FROM superstore.superstore_part2
+UNION ALL SELECT 'superstore.nomenclature',      COUNT(*),    17 FROM superstore.nomenclature
+UNION ALL SELECT 'allsales.allsales_part1',      COUNT(*), 20000 FROM allsales.allsales_part1
+UNION ALL SELECT 'allsales.allsales_part2',      COUNT(*), 20000 FROM allsales.allsales_part2
+UNION ALL SELECT 'allsales.allsales_team',       COUNT(*),    31 FROM allsales.allsales_team
+UNION ALL SELECT 'allsales.allsales_store',      COUNT(*),   367 FROM allsales.allsales_store;

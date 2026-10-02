@@ -1,9 +1,10 @@
 -- =============================================================================
 -- 03_load_tables.sql (Snowflake)
--- Object : Loads the 9 stage files into Snowflake tables across 3 use cases
---          RAW Layer   = all STRING, original column names (for student exercises)
---          CLEAN Layer = proper types, snake_case names, UNCLEANED VALUES (by design)
--- Idempotent : Yes (CREATE OR REPLACE)
+-- Object : Loads the 9 stage files into 9 tables, strictly 1 CSV = 1 table
+--          Every column is STRING, ALL columns kept in file order,
+--          no union, no cast, no constraints.
+--          Students pre-process the data themselves (Power Query / Tableau Prep).
+-- Idempotent : Yes (CREATE OR REPLACE / DROP TABLE IF EXISTS)
 -- Duration : ~1 minute on XSMALL Warehouse
 -- =============================================================================
 
@@ -11,11 +12,29 @@ USE DATABASE EMLYON_USE_CASES;
 USE WAREHOUSE EMLYON_WH;
 
 -- =============================================================================
+-- 0. LEGACY CLEANUP (previous RAW_* / FACT_* / DIM_* layers)
+-- =============================================================================
+DROP TABLE IF EXISTS GDP.FACT_LIFE_EXPECTANCY;
+DROP TABLE IF EXISTS GDP.DIM_CONTINENT;
+DROP TABLE IF EXISTS GDP.RAW_LIFE_EXPECTANCY;
+DROP TABLE IF EXISTS GDP.RAW_CONTINENT_MAPPING;
+DROP TABLE IF EXISTS SUPERSTORE.FACT_ORDERS;
+DROP TABLE IF EXISTS SUPERSTORE.DIM_CATEGORY;
+DROP TABLE IF EXISTS SUPERSTORE.RAW_ORDERS;
+DROP TABLE IF EXISTS SUPERSTORE.RAW_NOMENCLATURE;
+DROP TABLE IF EXISTS ALLSALES.FACT_ORDERS;
+DROP TABLE IF EXISTS ALLSALES.DIM_SALES_TEAM;
+DROP TABLE IF EXISTS ALLSALES.DIM_STORE;
+DROP TABLE IF EXISTS ALLSALES.RAW_ORDERS;
+DROP TABLE IF EXISTS ALLSALES.RAW_TEAM;
+DROP TABLE IF EXISTS ALLSALES.RAW_STORE;
+
+-- =============================================================================
 -- USE CASE 1 : GDP
 -- =============================================================================
 
--- 1.1 RAW : Life expectancy vs GDP (12,744 rows expected) --------------------
-CREATE OR REPLACE TABLE GDP.RAW_LIFE_EXPECTANCY (
+-- 1.1 Life expectancy vs GDP (12,744 rows expected) ---------------------------
+CREATE OR REPLACE TABLE GDP.LIFE_EXPECTANCY (
   CODE STRING,
   CONTINENT STRING,
   COUNTRY STRING,
@@ -25,62 +44,34 @@ CREATE OR REPLACE TABLE GDP.RAW_LIFE_EXPECTANCY (
   LIFE_EXP STRING,
   POPULATION STRING
 )
-COMMENT = 'Raw source Our World in Data. Decimal commas on Life exp.';
+COMMENT = 'Source file life_expectancy.csv, as is. Decimal commas on Life exp.';
 
-COPY INTO GDP.RAW_LIFE_EXPECTANCY
-FROM @GDP.RAW_STAGE/life_expectancy.csv
+COPY INTO GDP.LIFE_EXPECTANCY
+FROM @GDP.RAW_STAGE
+FILES = ('life_expectancy.csv')
 FILE_FORMAT = (FORMAT_NAME = 'GDP.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 1.2 RAW : Continent mapping reference table (3 rows expected) ---------------
-CREATE OR REPLACE TABLE GDP.RAW_CONTINENT_MAPPING (
+-- 1.2 Continent mapping (3 rows expected) -------------------------------------
+CREATE OR REPLACE TABLE GDP.CONTINENT_MAPPING (
   CONTINENT STRING,
   CODE_CONTINENT STRING
 )
-COMMENT = 'Continent reference table INTENTIONALLY INCOMPLETE (Europe, Asia, Mars)';
+COMMENT = 'Source file continent_mapping.csv, as is. INTENTIONALLY INCOMPLETE (Europe, Asia, Mars).';
 
-COPY INTO GDP.RAW_CONTINENT_MAPPING
-FROM @GDP.RAW_STAGE/continent_mapping.csv
+COPY INTO GDP.CONTINENT_MAPPING
+FROM @GDP.RAW_STAGE
+FILES = ('continent_mapping.csv')
 FILE_FORMAT = (FORMAT_NAME = 'GDP.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 1.3 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE GDP.FACT_LIFE_EXPECTANCY
-COMMENT = 'Life expectancy and GDP per capita, per country and per year.'
-AS
-SELECT
-  CODE                                                   AS COUNTRY_CODE,
-  COUNTRY                                                AS COUNTRY,
-  CONTINENT                                              AS CONTINENT,
-  TRY_CAST(YEAR AS INT)                                  AS YEAR,
-  TRY_CAST(REPLACE(GDP, ',', '.') AS DOUBLE)             AS GDP_PER_CAPITA,
-  TRY_CAST(REPLACE(LIFE_EXP, ',', '.') AS DOUBLE)        AS LIFE_EXPECTANCY,
-  TRY_CAST(POPULATION AS BIGINT)                         AS POPULATION
-FROM GDP.RAW_LIFE_EXPECTANCY;
-
--- 1.4 CLEAN : Continent dimension ---------------------------------------------
-CREATE OR REPLACE TABLE GDP.DIM_CONTINENT
-COMMENT = 'Continent reference dimension (partially complete by pedagogical design).'
-AS
-SELECT CONTINENT AS CONTINENT, CODE_CONTINENT AS CONTINENT_CODE
-FROM GDP.RAW_CONTINENT_MAPPING;
-
-ALTER TABLE GDP.DIM_CONTINENT ADD CONSTRAINT PK_DIM_CONTINENT PRIMARY KEY (CONTINENT);
-ALTER TABLE GDP.FACT_LIFE_EXPECTANCY ADD CONSTRAINT FK_FACT_LIFE_EXPECTANCY_CONTINENT FOREIGN KEY (CONTINENT) REFERENCES GDP.DIM_CONTINENT(CONTINENT);
-
-COMMENT ON COLUMN GDP.FACT_LIFE_EXPECTANCY.COUNTRY_CODE    IS 'ISO-3 country code';
-COMMENT ON COLUMN GDP.FACT_LIFE_EXPECTANCY.GDP_PER_CAPITA  IS 'GDP per capita, constant USD';
-COMMENT ON COLUMN GDP.FACT_LIFE_EXPECTANCY.LIFE_EXPECTANCY IS 'Life expectancy at birth, in years';
-COMMENT ON COLUMN GDP.FACT_LIFE_EXPECTANCY.POPULATION      IS 'Total country population';
-COMMENT ON COLUMN GDP.DIM_CONTINENT.CONTINENT_CODE         IS 'Short continent code (partial reference table)';
-
 -- =============================================================================
 -- USE CASE 2 : SUPERSTORE
+-- part1 and part2 have DIFFERENT column orders: each table follows its own file.
 -- =============================================================================
 
--- 2.1 RAW : Union of the 2 migration batches (3,895 + 6,105 = 10,000 rows expected)
-CREATE OR REPLACE TABLE SUPERSTORE.RAW_ORDERS (
-  SOURCE_FILE STRING,
+-- 2.1 Migration batch 1 (3,895 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE SUPERSTORE.SUPERSTORE_PART1 (
   CITY STRING,
   COUNTRY_REGION STRING,
   CUSTOMER_NAME STRING,
@@ -101,83 +92,63 @@ CREATE OR REPLACE TABLE SUPERSTORE.RAW_ORDERS (
   QUANTITY STRING,
   SALES STRING
 )
-COMMENT = 'EU Superstore orders, union of 2 migration batches.';
+COMMENT = 'Source file superstore_part1.csv, as is. Column order differs from part2.';
 
-COPY INTO SUPERSTORE.RAW_ORDERS
-FROM (
-  SELECT 'part1', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
-  FROM @SUPERSTORE.RAW_STAGE/superstore_part1.csv
-)
+COPY INTO SUPERSTORE.SUPERSTORE_PART1
+FROM @SUPERSTORE.RAW_STAGE
+FILES = ('superstore_part1.csv')
 FILE_FORMAT = (FORMAT_NAME = 'SUPERSTORE.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
-COPY INTO SUPERSTORE.RAW_ORDERS
-FROM (
-  SELECT 'part2', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
-  FROM @SUPERSTORE.RAW_STAGE/superstore_part2.csv
+-- 2.2 Migration batch 2 (6,105 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE SUPERSTORE.SUPERSTORE_PART2 (
+  COUNTRY_REGION STRING,
+  CITY STRING,
+  CUSTOMER_NAME STRING,
+  MANUFACTURER STRING,
+  ORDER_DATE STRING,
+  ORDER_ID STRING,
+  PRODUCT_NAME STRING,
+  REGION STRING,
+  REMOVE_INC STRING,
+  REMOVE_INC_2 STRING,
+  SEGMENT STRING,
+  SHIP_DATE STRING,
+  SHIP_MODE STRING,
+  STATE_PROVINCE STRING,
+  SUB_CATEGORY STRING,
+  DISCOUNT STRING,
+  PROFIT STRING,
+  QUANTITY STRING,
+  SALES STRING
 )
+COMMENT = 'Source file superstore_part2.csv, as is. Column order differs from part1.';
+
+COPY INTO SUPERSTORE.SUPERSTORE_PART2
+FROM @SUPERSTORE.RAW_STAGE
+FILES = ('superstore_part2.csv')
 FILE_FORMAT = (FORMAT_NAME = 'SUPERSTORE.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 2.2 RAW : Category nomenclature (17 rows expected) --------------------------
-CREATE OR REPLACE TABLE SUPERSTORE.RAW_NOMENCLATURE (
+-- 2.3 Category nomenclature (17 rows expected) --------------------------------
+CREATE OR REPLACE TABLE SUPERSTORE.NOMENCLATURE (
   CATEGORY STRING,
   SUB_CATEGORY STRING
 )
-COMMENT = 'Category / Sub-Category nomenclature.';
+COMMENT = 'Source file nomenclature.csv, as is. Prefixed categories (1-Office Supplies).';
 
-COPY INTO SUPERSTORE.RAW_NOMENCLATURE
-FROM @SUPERSTORE.RAW_STAGE/nomenclature.csv
+COPY INTO SUPERSTORE.NOMENCLATURE
+FROM @SUPERSTORE.RAW_STAGE
+FILES = ('nomenclature.csv')
 FILE_FORMAT = (FORMAT_NAME = 'SUPERSTORE.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
-
--- 2.3 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE SUPERSTORE.FACT_ORDERS
-COMMENT = 'EU Superstore order line items.'
-AS
-SELECT
-  ORDER_ID                                                      AS ORDER_ID,
-  TRY_TO_DATE(ORDER_DATE, 'DD/MM/YYYY')                         AS ORDER_DATE,
-  TRY_TO_DATE(SHIP_DATE,  'DD/MM/YYYY')                         AS SHIP_DATE,
-  SHIP_MODE                                                     AS SHIP_MODE,
-  CUSTOMER_NAME                                                 AS CUSTOMER_NAME,
-  SEGMENT                                                       AS SEGMENT,
-  COUNTRY_REGION                                                AS COUNTRY,
-  STATE_PROVINCE                                                AS STATE_PROVINCE,
-  CITY                                                          AS CITY,
-  REGION                                                        AS REGION,
-  MANUFACTURER                                                  AS MANUFACTURER,
-  PRODUCT_NAME                                                  AS PRODUCT_NAME,
-  SUB_CATEGORY                                                  AS SUB_CATEGORY,
-  TRY_CAST(REPLACE(QUANTITY, ',', '.') AS INT)                  AS QUANTITY,
-  TRY_CAST(REPLACE(SALES,    ',', '.') AS DOUBLE)               AS SALES,
-  TRY_CAST(REPLACE(PROFIT,   ',', '.') AS DOUBLE)               AS PROFIT,
-  TRY_CAST(REPLACE(DISCOUNT, ',', '.') AS DOUBLE)               AS DISCOUNT,
-  SOURCE_FILE                                                   AS SOURCE_FILE
-FROM SUPERSTORE.RAW_ORDERS;
-
--- 2.4 CLEAN : Category dimension ----------------------------------------------
-CREATE OR REPLACE TABLE SUPERSTORE.DIM_CATEGORY
-COMMENT = 'Category dimension.'
-AS
-SELECT SUB_CATEGORY AS SUB_CATEGORY, CATEGORY AS CATEGORY
-FROM SUPERSTORE.RAW_NOMENCLATURE;
-
-ALTER TABLE SUPERSTORE.DIM_CATEGORY ADD CONSTRAINT PK_DIM_CATEGORY PRIMARY KEY (SUB_CATEGORY);
-ALTER TABLE SUPERSTORE.FACT_ORDERS ADD CONSTRAINT FK_FACT_ORDERS_CATEGORY FOREIGN KEY (SUB_CATEGORY) REFERENCES SUPERSTORE.DIM_CATEGORY(SUB_CATEGORY);
-
-COMMENT ON COLUMN SUPERSTORE.FACT_ORDERS.SALES       IS 'Line item sales revenue, EUR';
-COMMENT ON COLUMN SUPERSTORE.FACT_ORDERS.PROFIT      IS 'Line item profit margin, EUR';
-COMMENT ON COLUMN SUPERSTORE.FACT_ORDERS.DISCOUNT    IS 'Applied discount rate (0 to 1)';
-COMMENT ON COLUMN SUPERSTORE.FACT_ORDERS.SOURCE_FILE IS 'Original migration batch: part1 or part2';
 
 -- =============================================================================
 -- USE CASE 3 : ALLSALES
 -- =============================================================================
 
--- 3.1 RAW : Union of 2 sales batches (20,000 + 20,000 = 40,000 rows expected)
-CREATE OR REPLACE TABLE ALLSALES.RAW_ORDERS (
-  SOURCE_FILE STRING,
+-- 3.1 Sales batch 2025 (20,000 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE ALLSALES.ALLSALES_PART1 (
   ORDER_NUMBER STRING,
   SOURCE STRING,
   COMPANY STRING,
@@ -191,44 +162,58 @@ CREATE OR REPLACE TABLE ALLSALES.RAW_ORDERS (
   UNIT_PRICE STRING,
   UNIT_COST STRING
 )
-COMMENT = 'Global sales transactions, union of 2025 and 2026 batches.';
+COMMENT = 'Source file allsales_part1.csv, as is (2025 batch).';
 
-COPY INTO ALLSALES.RAW_ORDERS
-FROM (
-  SELECT 'part1', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-  FROM @ALLSALES.RAW_STAGE/allsales_part1.csv
-)
+COPY INTO ALLSALES.ALLSALES_PART1
+FROM @ALLSALES.RAW_STAGE
+FILES = ('allsales_part1.csv')
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
-COPY INTO ALLSALES.RAW_ORDERS
-FROM (
-  SELECT 'part2', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-  FROM @ALLSALES.RAW_STAGE/allsales_part2.csv
+-- 3.2 Sales batch 2026 (20,000 rows expected) ---------------------------------
+CREATE OR REPLACE TABLE ALLSALES.ALLSALES_PART2 (
+  ORDER_NUMBER STRING,
+  SOURCE STRING,
+  COMPANY STRING,
+  SALES_DATE STRING,
+  SALES_CHANNEL STRING,
+  CURRENCY STRING,
+  SALES_AGENT_ID STRING,
+  STORE_ID STRING,
+  PRODUCT STRING,
+  ORDER_QTY STRING,
+  UNIT_PRICE STRING,
+  UNIT_COST STRING
 )
+COMMENT = 'Source file allsales_part2.csv, as is (2026 batch).';
+
+COPY INTO ALLSALES.ALLSALES_PART2
+FROM @ALLSALES.RAW_STAGE
+FILES = ('allsales_part2.csv')
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 3.2 RAW : Sales team reference table (31 rows expected) --------------------
-CREATE OR REPLACE TABLE ALLSALES.RAW_TEAM (
+-- 3.3 Sales team (31 rows expected) -------------------------------------------
+CREATE OR REPLACE TABLE ALLSALES.ALLSALES_TEAM (
+  COLUMN_1 STRING,
   INDEX STRING,
   SALES_TEAM STRING,
   REGION STRING
 )
-COMMENT = 'Sales agents reference table.';
+COMMENT = 'Source file allsales_team.csv, as is. Unnamed first column (COLUMN_1).';
 
-COPY INTO ALLSALES.RAW_TEAM
-FROM (
-  SELECT t.$2, t.$3, t.$4
-  FROM @ALLSALES.RAW_STAGE/allsales_team.csv t
-)
+COPY INTO ALLSALES.ALLSALES_TEAM
+FROM @ALLSALES.RAW_STAGE
+FILES = ('allsales_team.csv')
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 3.3 RAW : Store locations reference table (367 rows expected) ---------------
-CREATE OR REPLACE TABLE ALLSALES.RAW_STORE (
+-- 3.4 Store locations (367 rows expected) -------------------------------------
+CREATE OR REPLACE TABLE ALLSALES.ALLSALES_STORE (
+  COLUMN_1 STRING,
   ID STRING,
   NAME STRING,
+  COLONNE1 STRING,
   COUNTY STRING,
   REGION STRING,
   STATE_CODE STRING,
@@ -240,85 +225,28 @@ CREATE OR REPLACE TABLE ALLSALES.RAW_STORE (
   POPULATION STRING,
   HOUSEHOLDS STRING,
   MEDIAN_INCOME STRING,
-  LAND_AREA STRING
+  LAND_AREA STRING,
+  WATER_AREA STRING,
+  TIME_ZONE STRING,
+  STATE_GEO STRING
 )
-COMMENT = 'Store locations and demographic metadata.';
+COMMENT = 'Source file allsales_store.csv, as is. Unnamed first column (COLUMN_1) and extra columns.';
 
-COPY INTO ALLSALES.RAW_STORE
-FROM (
-  SELECT t.$2, t.$3, t.$5, t.$6, t.$7, t.$8, t.$9, t.$10, t.$11, t.$12, t.$13, t.$14, t.$15, t.$16
-  FROM @ALLSALES.RAW_STAGE/allsales_store.csv t
-)
+COPY INTO ALLSALES.ALLSALES_STORE
+FROM @ALLSALES.RAW_STAGE
+FILES = ('allsales_store.csv')
 FILE_FORMAT = (FORMAT_NAME = 'ALLSALES.CSV_FORMAT_SEMICOLON')
 ON_ERROR = 'CONTINUE';
 
--- 3.4 CLEAN : Typed fact table ------------------------------------------------
-CREATE OR REPLACE TABLE ALLSALES.FACT_ORDERS
-COMMENT = 'Sales order line items with calculated sales, cost, and profit amounts.'
-AS
-SELECT
-  ORDER_NUMBER                                                  AS ORDER_NUMBER,
-  TRY_TO_DATE(SALES_DATE, 'YYYY-MM-DD HH24:MI:SS')               AS SALES_DATE,
-  SALES_CHANNEL                                                 AS SALES_CHANNEL,
-  COMPANY                                                       AS COMPANY,
-  CURRENCY                                                      AS CURRENCY,
-  TRY_CAST(SALES_AGENT_ID AS INT)                               AS SALES_AGENT_ID,
-  TRY_CAST(STORE_ID AS INT)                                     AS STORE_ID,
-  PRODUCT                                                       AS PRODUCT,
-  TRY_CAST(REPLACE(ORDER_QTY, ',', '.') AS INT)                 AS ORDER_QUANTITY,
-  TRY_CAST(REPLACE(UNIT_PRICE, ',', '.') AS DOUBLE)             AS UNIT_PRICE,
-  TRY_CAST(REPLACE(UNIT_COST,  ',', '.') AS DOUBLE)             AS UNIT_COST,
-  TRY_CAST(REPLACE(ORDER_QTY, ',', '.') AS INT) * TRY_CAST(REPLACE(UNIT_PRICE, ',', '.') AS DOUBLE) AS SALES_AMOUNT,
-  TRY_CAST(REPLACE(ORDER_QTY, ',', '.') AS INT) * TRY_CAST(REPLACE(UNIT_COST,  ',', '.') AS DOUBLE) AS COST_AMOUNT,
-  (TRY_CAST(REPLACE(ORDER_QTY, ',', '.') AS INT) * TRY_CAST(REPLACE(UNIT_PRICE, ',', '.') AS DOUBLE)) - 
-  (TRY_CAST(REPLACE(ORDER_QTY, ',', '.') AS INT) * TRY_CAST(REPLACE(UNIT_COST,  ',', '.') AS DOUBLE)) AS PROFIT_AMOUNT,
-  SOURCE_FILE                                                   AS SOURCE_FILE
-FROM ALLSALES.RAW_ORDERS;
-
--- 3.5 CLEAN : Typed dimension tables ------------------------------------------
-CREATE OR REPLACE TABLE ALLSALES.DIM_SALES_TEAM
-COMMENT = 'Sales team dimension.'
-AS
-SELECT
-  TRY_CAST(INDEX AS INT) AS SALES_AGENT_ID,
-  SALES_TEAM             AS SALES_TEAM_NAME,
-  REGION                 AS SALES_REGION
-FROM ALLSALES.RAW_TEAM;
-
-ALTER TABLE ALLSALES.DIM_SALES_TEAM ADD CONSTRAINT PK_DIM_SALES_TEAM PRIMARY KEY (SALES_AGENT_ID);
-
-CREATE OR REPLACE TABLE ALLSALES.DIM_STORE
-COMMENT = 'Store locations dimension.'
-AS
-SELECT
-  TRY_CAST(ID AS INT)                                      AS STORE_ID,
-  NAME                                                     AS STORE_NAME,
-  COUNTY                                                   AS COUNTY,
-  REGION                                                   AS REGION,
-  STATE_CODE                                               AS STATE_CODE,
-  STATE                                                    AS STATE,
-  TYPE                                                     AS STORE_TYPE,
-  TRY_CAST(REPLACE(LATITUDE, ',', '.') AS DOUBLE)          AS LATITUDE,
-  TRY_CAST(REPLACE(LONGITUDE, ',', '.') AS DOUBLE)         AS LONGITUDE,
-  TRY_CAST(AREA_CODE AS INT)                               AS AREA_CODE,
-  TRY_CAST(REPLACE(POPULATION, ',', '.') AS BIGINT)        AS POPULATION,
-  TRY_CAST(REPLACE(HOUSEHOLDS, ',', '.') AS BIGINT)        AS HOUSEHOLDS,
-  TRY_CAST(REPLACE(MEDIAN_INCOME, ',', '.') AS DOUBLE)     AS MEDIAN_INCOME,
-  TRY_CAST(REPLACE(LAND_AREA, ',', '.') AS DOUBLE)         AS LAND_AREA
-FROM ALLSALES.RAW_STORE;
-
-ALTER TABLE ALLSALES.DIM_STORE ADD CONSTRAINT PK_DIM_STORE PRIMARY KEY (STORE_ID);
-
-ALTER TABLE ALLSALES.FACT_ORDERS ADD CONSTRAINT FK_FACT_ORDERS_SALES_AGENT FOREIGN KEY (SALES_AGENT_ID) REFERENCES ALLSALES.DIM_SALES_TEAM(SALES_AGENT_ID);
-ALTER TABLE ALLSALES.FACT_ORDERS ADD CONSTRAINT FK_FACT_ORDERS_STORE FOREIGN KEY (STORE_ID) REFERENCES ALLSALES.DIM_STORE(STORE_ID);
-
 -- =============================================================================
--- 4. ROW COUNT CHECKS
+-- 4. ROW COUNT CHECKS (all 9 rows should return expected volumes)
 -- =============================================================================
-SELECT 'GDP.FACT_LIFE_EXPECTANCY'    AS TABLE_NAME, COUNT(*) AS ROW_COUNT, 12744 AS EXPECTED FROM GDP.FACT_LIFE_EXPECTANCY
-UNION ALL SELECT 'GDP.DIM_CONTINENT',            COUNT(*),     3 FROM GDP.DIM_CONTINENT
-UNION ALL SELECT 'SUPERSTORE.FACT_ORDERS',       COUNT(*), 10000 FROM SUPERSTORE.FACT_ORDERS
-UNION ALL SELECT 'SUPERSTORE.DIM_CATEGORY',      COUNT(*),    17 FROM SUPERSTORE.DIM_CATEGORY
-UNION ALL SELECT 'ALLSALES.FACT_ORDERS',         COUNT(*), 40000 FROM ALLSALES.FACT_ORDERS
-UNION ALL SELECT 'ALLSALES.DIM_SALES_TEAM',      COUNT(*),    31 FROM ALLSALES.DIM_SALES_TEAM
-UNION ALL SELECT 'ALLSALES.DIM_STORE',           COUNT(*),   367 FROM ALLSALES.DIM_STORE;
+SELECT 'GDP.LIFE_EXPECTANCY'         AS TABLE_NAME, COUNT(*) AS ROW_COUNT, 12744 AS EXPECTED FROM GDP.LIFE_EXPECTANCY
+UNION ALL SELECT 'GDP.CONTINENT_MAPPING',        COUNT(*),     3 FROM GDP.CONTINENT_MAPPING
+UNION ALL SELECT 'SUPERSTORE.SUPERSTORE_PART1',  COUNT(*),  3895 FROM SUPERSTORE.SUPERSTORE_PART1
+UNION ALL SELECT 'SUPERSTORE.SUPERSTORE_PART2',  COUNT(*),  6105 FROM SUPERSTORE.SUPERSTORE_PART2
+UNION ALL SELECT 'SUPERSTORE.NOMENCLATURE',      COUNT(*),    17 FROM SUPERSTORE.NOMENCLATURE
+UNION ALL SELECT 'ALLSALES.ALLSALES_PART1',      COUNT(*), 20000 FROM ALLSALES.ALLSALES_PART1
+UNION ALL SELECT 'ALLSALES.ALLSALES_PART2',      COUNT(*), 20000 FROM ALLSALES.ALLSALES_PART2
+UNION ALL SELECT 'ALLSALES.ALLSALES_TEAM',       COUNT(*),    31 FROM ALLSALES.ALLSALES_TEAM
+UNION ALL SELECT 'ALLSALES.ALLSALES_STORE',      COUNT(*),   367 FROM ALLSALES.ALLSALES_STORE;
