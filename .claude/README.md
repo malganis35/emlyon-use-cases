@@ -139,6 +139,18 @@ Invocation explicite possible : `/setup-instructeur`.
 
 ---
 
+## `skills/nouveau-dataset/SKILL.md` — nouveau dataset avec disqualités
+
+À partir d'un dataset fourni par un professeur et d'un fichier de référence de `docs/`
+(ex. `docs/disquality_cao.md`), elle choisit les disqualités avec `AskUserQuestion`, écrit
+`use_cases/<nom>/manifest.yaml`, puis génère les CSV dégradés et les scripts
+Snowflake / Databricks dans `script/<plateforme>/generated/<nom>/`. Elle s'arrête avant tout
+upload et demande confirmation.
+
+Invocation explicite possible : `/nouveau-dataset`.
+
+---
+
 ## Serveurs MCP
 
 Aucun `.mcp.json` n'est fourni pour ce projet. Pour en ajouter un, crée `.mcp.json`

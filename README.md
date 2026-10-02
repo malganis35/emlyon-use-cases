@@ -131,6 +131,25 @@ The datasets intentionally contain **deliberate data quality issues** that shoul
 | **Superstore** | Prefixed categories (`1-Office Supplies`, `10-Technology`, `100-Furniture`). | String extraction (Split / Text Parsing) and custom sorting. |
 | **Allsales** | Multi-year order batches (`allsales_part1` 2025 & `allsales_part2` 2026) with 40,000 transactions. `allsales_team` / `allsales_store` have an unnamed first column and extra columns. | Append the 2 batches, star-schema modeling (orders linked to `allsales_team` & `allsales_store`), typing, calculated metrics (sales, cost, profit amounts). |
 
+### Adding a new use case with generated disqualities
+
+An instructor can add a dataset with the `/nouveau-dataset` Claude Code skill. It reads a reference file from `docs/` (e.g. `docs/disquality_cao.md`), asks which disqualities to apply, writes `use_cases/<name>/manifest.yaml`, then generates the degraded CSVs and the scripts under `script/<platform>/generated/<name>/`. The same steps by hand:
+
+```bash
+uv run emlyon-use-cases degrade      --manifest use_cases/<name>/manifest.yaml --dst ./data
+uv run emlyon-use-cases generate-sql --manifest use_cases/<name>/manifest.yaml --data ./data --dst ./script
+```
+
+Then run, per platform, `01_`, `02_upload_files.sh ./data`, `03_` (check that `row_count = expected`) and `04_` (read-only grants), as for the three datasets above.
+
+| Disquality type | What it injects | Student Exercise Objective |
+| :--- | :--- | :--- |
+| `junk_rows` | Rows after the header with only a `zz_test` marker. | Delete the first rows. |
+| `null_columns` | Empty, explicitly named columns. | Delete useless columns. |
+| `value_prefix` | A constant prefix on every value (`Sales Channel: Online`). | Replace values. |
+| `code_prefix` | `1-`, `2-`, `11-` prefixes. | Split a column by a separator. |
+| `mixed_decimal` | `.` and `,` decimal separators mixed in one column. | Locale settings (US / FR) to get decimal numbers. |
+
 ---
 
 ## 7. 🧹 Inter-Cohort Reset Procedure

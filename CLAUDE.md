@@ -12,10 +12,11 @@ Pedagogical data pipeline for emlyon Business School BI & DataViz courses (Power
 - Upload to Snowflake stages: `bash script/snowflake/02_upload_files.sh ./data` (connection from `$SNOWSQL_CONN`, default `emlyon`, read from `~/.snowflake/connections.toml`)
 - The `01_`, `03_`, `04_` and `99_` SQL scripts run manually in the Databricks SQL Editor or Snowsight, in numeric order. `03_load_tables.sql` ends with a row-count check query that compares each table to its expected count.
 
+- New use case with disqualities: run the `/nouveau-dataset` skill, or by hand `uv run emlyon-use-cases degrade --manifest use_cases/<name>/manifest.yaml --dst ./data`, then `generate-sql --manifest ... --data ./data --dst ./script`. `profile --src <file>` prints the columns of a raw source as JSON.
 - Check or prepare an instructor machine (uv, Node, git, Databricks and Snowflake CLIs and connections): run the `/setup-instructeur` skill.
 - Lint / format Python: `uv run ruff check src/` and `uv run ruff format src/`. Ruff is a dev dependency, and a `.claude/` PostToolUse hook runs it automatically on every `.py` file Claude edits.
 
-There is no test suite or CI.
+Tests: `uv run pytest` (covers the manifest, disqualities, CLI and SQL generation). There is no CI.
 
 ## Architecture
 - **Python CLI** (`src/emlyon_use_cases/`): `converter.prepare_datasets()` holds a hardcoded `mappings` list of (source path, output CSV, `xlsx`|`csv`, sheet name). XLSX sheets are exported with `openpyxl` (`data_only=True`, empty rows skipped). CSV sources are copied with the UTF-8 BOM removed and CRLF converted to LF. The Databricks upload script normalizes BOM and CRLF a second time with `sed`.
@@ -26,7 +27,9 @@ There is no test suite or CI.
   - Superstore part1 and part2 have different column orders (the "union by name" trap). They are two separate tables on both platforms, and each Snowflake table follows its own file's order.
 - **Naming**: Databricks uses lowercase schemas `gdp`, `superstore`, `allsales` in catalog `emlyon_use_cases`, with a `raw_files` volume per schema. Snowflake uses uppercase `GDP`/`SUPERSTORE`/`ALLSALES` in `EMLYON_USE_CASES`, with an `@RAW_STAGE` stage and a `CSV_FORMAT_SEMICOLON` file format per schema, on warehouse `EMLYON_WH`.
 
-### Adding or changing a dataset
+- **Manifest-driven use cases** (new datasets): `use_cases/<name>/manifest.yaml` is the single source. `manifest.py` loads it, `disqualities.py` holds the pure, idempotent, seeded disquality functions (`junk_rows`, `null_columns`, `value_prefix`, `code_prefix`, `mixed_decimal`), `degrade.py` builds the CSVs (`<use_case>_<table>.csv`, `;`, UTF-8 without BOM, LF), and `sqlgen.py` generates the `01_`/`02_`/`03_`/`04_` scripts of both platforms under `script/<platform>/generated/<use_case>/` from the real CSV headers and row counts. Generated files must never be edited by hand: fix the manifest or `sqlgen.py` and regenerate. The three original datasets (`gdp`, `superstore`, `allsales`) still use the hand-written scripts below.
+
+### Adding or changing one of the three original datasets
 The file list is duplicated in several places, so update all of them together:
 - the `mappings` list in `converter.py`
 - the file lists in both `02_upload_files.sh` scripts

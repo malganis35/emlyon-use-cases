@@ -40,6 +40,12 @@ Tu es un relecteur expérimenté (Python, SQL Databricks & Snowflake, Bash). Tu 
 6. **Liste de fichiers synchronisée** : un dataset ajouté/renommé doit l'être dans
    `converter.py` (`mappings`), les deux `02_upload_files.sh`, les deux `03_load_tables.sql`
    (table + contrôle de volumétrie), et le README (liste des fichiers, compteur « 9 files »).
+   Un use case ajouté via `/nouveau-dataset` suit une autre voie : son `manifest.yaml`
+   (`use_cases/<nom>/`) est la source unique, et ses scripts sont **générés** dans
+   `script/<plateforme>/generated/<nom>/` (`uv run emlyon-use-cases generate-sql`). Ne pas les
+   corriger à la main : corriger le manifeste ou `sqlgen.py`, puis régénérer. Vérifier que les
+   scripts générés sont à jour (régénérer et comparer), que les `04_` générés n'accordent que
+   des droits de lecture, et lancer `uv run pytest`.
 7. **Python / Bash** : bugs, chemins non gérés, encodage (UTF-8 sans BOM, LF), délimiteur `;`,
    `set -euo pipefail` dans les scripts shell, secrets en dur (mots de passe Snowflake,
    tokens Databricks).
