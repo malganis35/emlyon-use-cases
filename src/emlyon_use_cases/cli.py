@@ -1,6 +1,9 @@
 import argparse
 import sys
 from pathlib import Path
+from zipfile import BadZipFile
+
+from openpyxl.utils.exceptions import InvalidFileException
 
 from emlyon_use_cases.converter import prepare_datasets
 
@@ -44,8 +47,10 @@ def main() -> None:
             generated = prepare_datasets(src_dir, dst_dir)
             print()
             print(f"=== Success: {len(generated)} files generated in {dst_dir}/ ===")
-            print("Next step: run 'bash script/databricks/02_upload_files.sh' or 'bash script/snowflake/02_upload_files.sh'")
-        except Exception as e:
+            print(
+                "Next step: run 'bash script/databricks/02_upload_files.sh' or 'bash script/snowflake/02_upload_files.sh'"
+            )
+        except (OSError, ValueError, BadZipFile, InvalidFileException) as e:
             print(f"ERROR: {e}", file=sys.stderr)
             sys.exit(1)
 

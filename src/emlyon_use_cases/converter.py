@@ -14,7 +14,9 @@ def convert_xlsx_to_csv(
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
     if sheet_name:
         if sheet_name not in wb.sheetnames:
-            raise ValueError(f"Worksheet '{sheet_name}' not found in {xlsx_path}. Available: {wb.sheetnames}")
+            raise ValueError(
+                f"Worksheet '{sheet_name}' not found in {xlsx_path}. Available: {wb.sheetnames}"
+            )
         sheet = wb[sheet_name]
     else:
         sheet = wb.active
@@ -40,7 +42,11 @@ def normalize_and_copy_csv(src_csv: Path, dst_csv: Path) -> None:
     if content.startswith(b"\xef\xbb\xbf"):
         content = content[3:]
     # Convert CRLF to LF
-    text = content.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    text = (
+        content.decode("utf-8", errors="replace")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
     dst_csv.write_text(text, encoding="utf-8")
 
 
@@ -75,13 +81,17 @@ def prepare_datasets(src_dir: Path, dst_dir: Path) -> list[Path]:
             None,
         ),
         (
-            src_dir / "superstore" / "Sample - EU Superstore_Migrated Data - Part 1.csv",
+            src_dir
+            / "superstore"
+            / "Sample - EU Superstore_Migrated Data - Part 1.csv",
             dst_dir / "superstore_part1.csv",
             "csv",
             None,
         ),
         (
-            src_dir / "superstore" / "Sample - EU Superstore_Migrated Data - Part 2.csv",
+            src_dir
+            / "superstore"
+            / "Sample - EU Superstore_Migrated Data - Part 2.csv",
             dst_dir / "superstore_part2.csv",
             "csv",
             None,
@@ -120,8 +130,12 @@ def prepare_datasets(src_dir: Path, dst_dir: Path) -> list[Path]:
 
         if file_type == "xlsx":
             sheet_info = f" (sheet: '{sheet_name}')" if sheet_name else ""
-            print(f"-> Converting XLSX to CSV{sheet_info}: {src_path.name} => {dst_path.name}")
-            convert_xlsx_to_csv(src_path, dst_path, sheet_name=sheet_name, delimiter=";")
+            print(
+                f"-> Converting XLSX to CSV{sheet_info}: {src_path.name} => {dst_path.name}"
+            )
+            convert_xlsx_to_csv(
+                src_path, dst_path, sheet_name=sheet_name, delimiter=";"
+            )
         elif file_type == "csv":
             print(f"-> Normalizing CSV       : {src_path.name} => {dst_path.name}")
             normalize_and_copy_csv(src_path, dst_path)
