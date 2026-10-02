@@ -11,15 +11,15 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
-      "Bash(git branch:*)"
-    ],
-    "ask": [
-      "Bash(git rebase:*)",
-      "Bash(git reset:*)",
-      "Bash(bash script/databricks/02_upload_files.sh:*)",
-      "Bash(bash script/snowflake/02_upload_files.sh:*)",
-      "Bash(databricks:*)",
-      "Bash(snowsql:*)"
+      "Bash(git branch:*)",
+      "Bash(snow --version)",
+      "Bash(git config *)",
+      "Bash(uv --version)",
+      "Bash(uv python *)",
+      "Bash(npm -v)",
+      "Bash(npm config *)",
+      "Bash(git --version)",
+      "Bash(rtk git *)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -31,6 +31,14 @@
       "Read(./**/*.pem)",
       "Edit(./.env)",
       "Edit(./.env.*)"
+    ],
+    "ask": [
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(bash script/databricks/02_upload_files.sh:*)",
+      "Bash(bash script/snowflake/02_upload_files.sh:*)",
+      "Bash(databricks:*)",
+      "Bash(snowsql:*)"
     ]
   },
   "hooks": {
@@ -38,7 +46,10 @@
       {
         "matcher": "Write|Edit",
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/ruff-format.js" }
+          {
+            "type": "command",
+            "command": "node .claude/hooks/ruff-format.js"
+          }
         ]
       }
     ]
