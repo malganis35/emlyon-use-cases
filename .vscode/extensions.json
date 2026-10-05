@@ -1,0 +1,49 @@
+{
+    "recommendations": [
+        // Python
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-python.vscode-python-envs",
+        "charliermarsh.ruff",
+        "the0807.uv-toolkit",
+        "njpwerner.autodocstring",
+        "kevinrose.vsc-python-indent",
+
+        // Notebooks & data
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "google.colab",
+
+        // Data
+        "ms-toolsai.datawrangler",
+        "mechatroner.rainbow-csv",
+        "grapecity.gc-excelviewer",
+        "aykutsarac.jsoncrack-vscode",
+        "lucien-martijn.parquet-visualizer",
+
+        // Git
+        "codezombiech.gitignore",
+
+        // Files & config
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml",
+        "esbenp.prettier-vscode",
+        "editorconfig.editorconfig",
+        "wholroyd.jinja",
+        "christian-kohler.path-intellisense",
+
+        // Quality of life
+        "streetsidesoftware.code-spell-checker",
+        "bierner.markdown-mermaid",
+        "github.copilot-chat"
+    ],
+    "unwantedRecommendations": [
+        "visualstudioexptteam.vscodeintellicode",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-python.flake8"
+    ]
+}
