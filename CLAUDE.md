@@ -16,7 +16,7 @@ Pedagogical data pipeline for emlyon Business School BI & DataViz courses (Power
 - Check or prepare an instructor machine (uv, Node, git, Databricks and Snowflake CLIs and connections): run the `/setup-instructeur` skill.
 - Lint / format Python: `uv run ruff check src/` and `uv run ruff format src/`. Ruff is a dev dependency, and a `.claude/` PostToolUse hook runs it automatically on every `.py` file Claude edits.
 
-Tests: `uv run pytest` (covers the manifest, disqualities, CLI and SQL generation). There is no CI.
+Tests: `uv run pytest` (covers the manifest, disqualities, CLI and SQL generation). Single test: `uv run pytest tests/test_sqlgen.py::test_name -q`. Fixtures live in `tests/fixtures/`. There is no CI.
 
 ## Architecture
 - **Python CLI** (`src/emlyon_use_cases/`): `converter.prepare_datasets()` holds a hardcoded `mappings` list of (source path, output CSV, `xlsx`|`csv`, sheet name). XLSX sheets are exported with `openpyxl` (`data_only=True`, empty rows skipped). CSV sources are copied with the UTF-8 BOM removed and CRLF converted to LF. The Databricks upload script normalizes BOM and CRLF a second time with `sed`.
