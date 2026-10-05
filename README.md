@@ -3,15 +3,18 @@
 Welcome to the **emlyon-use-cases** repository. This project provides an automated data pipeline for three pedagogical datasets (**GDP**, **EU Superstore**, and **Allsales**) designed for Business Intelligence and Data Visualization courses (Power BI / Tableau).
 
 The repository supports two ready-to-use Cloud platforms:
-- **Databricks Free Edition (Unity Catalog)** in [`script/databricks/`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/databricks/)
-- **Snowflake** in [`script/snowflake/`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/snowflake/)
+- **Databricks Free Edition (Unity Catalog)** in [`script/databricks/`](script/databricks/)
+- **Snowflake** in [`script/snowflake/`](script/snowflake/)
 
 This step-by-step guide is designed to allow any instructor or TA to deploy the complete environment in **15 to 20 minutes**.
+
+> 💡 **Fastest path:** open the project in [Claude Code](https://code.claude.com/docs) (`claude` at the repo root) and let the project skills do the heavy lifting — see [Quick Start with Claude Code](#quick-start-with-claude-code). Everything is also documented manually below.
 
 ---
 
 ## 📋 Table of Contents
 
+- [Quick Start with Claude Code](#quick-start-with-claude-code)
 - [1. Prerequisites & Local Setup](#1-prerequisites--local-setup)
 - [2. Step 1: Raw Data Preparation](#2-step-1-raw-data-preparation)
 - [3. Databricks Free Edition Deployment](#3-databricks-free-edition-deployment)
@@ -22,12 +25,31 @@ This step-by-step guide is designed to allow any instructor or TA to deploy the 
 
 ---
 
+## Quick Start with Claude Code
+
+The repository ships Claude Code skills and an agent (in [`.claude/`](.claude/), see [`.claude/README.md`](.claude/README.md)) that automate the setup. Nothing to configure: run `claude` at the repo root and accept the permission prompts.
+
+| Goal | Command | What it does |
+| :--- | :--- | :--- |
+| Prepare a new machine | `/setup-instructeur` | Checks/installs `uv`, Node, `git`, Databricks CLI and `snowsql`, then tests the Databricks and Snowflake connections. Use it first, or when an upload or connection fails. |
+| Add a dataset | `/nouveau-dataset` | Picks disqualities from a reference file in [`docs/`](docs/), writes the manifest, generates degraded CSVs and both platforms' SQL scripts. |
+| Review before committing | `code-quality-reviewer` agent | Reviews Python, SQL and upload-script changes for quality and platform consistency. |
+| Write a PR | `/pr-description` | Drafts the pull request description. |
+
+Typical first deployment: `/setup-instructeur` → `uv sync` → `uv run emlyon-use-cases prepare` → follow sections 3 and/or 4.
+
+New to the terminal (Windows / macOS)? See [`.vscode/ReadMe.MD`](.vscode/ReadMe.MD) for step-by-step installs of VS Code, `uv` and `git`, and run `uv run .vscode/install_extensions.py` to install the recommended editor extensions.
+
+---
+
 ## 1. Prerequisites & Local Setup
 
+> Shortcut: the `/setup-instructeur` skill checks all of this for you.
+
 Before starting, ensure your machine has the following tools installed:
-1. **Python 3.12+** and the **`uv`** package manager:
+1. **Python 3.12+** and the **`uv`** package manager (then run `uv sync` once to install dependencies):
    ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh   # Windows: see .vscode/ReadMe.MD
    ```
 2. **Platform CLI**:
    - **Databricks CLI v0.205+**: `databricks auth login --host https://<workspace>.cloud.databricks.com -p emlyon`
@@ -37,7 +59,7 @@ Before starting, ensure your machine has the following tools installed:
 
 ## 2. Step 1: Raw Data Preparation
 
-Raw source files (Excel `.xlsx` and CSV) are located in [`use_cases/`](file:///home/ctdo/emlyon/project/emlyon-use-cases/use_cases/) (`gdp/`, `superstore/`, and `allsales/`).
+Raw source files (Excel `.xlsx` and CSV) are located in [`use_cases/`](use_cases/) (`gdp/`, `superstore/`, and `allsales/`).
 
 Run the project's Python CLI to convert Excel sheets to `;`-delimited CSVs, strip UTF-8 BOM / CRLF line endings, and generate the `./data/` folder:
 
@@ -54,7 +76,7 @@ uv run emlyon-use-cases prepare
 
 ## 3. Databricks Free Edition Deployment
 
-Execution order in [`script/databricks/`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/databricks/):
+Execution order in [`script/databricks/`](script/databricks/):
 
 1. **`01_setup_unity_catalog.sql`** (Databricks SQL Editor): Creates catalog `emlyon_use_cases`, schemas `gdp`, `superstore`, `allsales`, and managed volumes `raw_files`.
 2. **`02_upload_files.sh`** (Local terminal):
@@ -68,7 +90,7 @@ Execution order in [`script/databricks/`](file:///home/ctdo/emlyon/project/emlyo
 
 ## 4. Snowflake Deployment
 
-Execution order in [`script/snowflake/`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/snowflake/):
+Execution order in [`script/snowflake/`](script/snowflake/):
 
 1. **`01_setup_snowflake.sql`** (Snowsight UI):
    - Creates database `EMLYON_USE_CASES`, schemas `GDP`, `SUPERSTORE`, and `ALLSALES`.
@@ -154,7 +176,7 @@ Then run, per platform, `01_`, `02_upload_files.sh ./data`, `03_` (check that `r
 
 ## 7. 🧹 Inter-Cohort Reset Procedure
 
-- **Databricks**: Run `DROP CATALOG IF EXISTS emlyon_use_cases CASCADE;` via [`script/databricks/99_reset.sql`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/databricks/99_reset.sql).
-- **Snowflake**: Run [`script/snowflake/99_reset.sql`](file:///home/ctdo/emlyon/project/emlyon-use-cases/script/snowflake/99_reset.sql).
+- **Databricks**: Run `DROP CATALOG IF EXISTS emlyon_use_cases CASCADE;` via [`script/databricks/99_reset.sql`](script/databricks/99_reset.sql).
+- **Snowflake**: Run [`script/snowflake/99_reset.sql`](script/snowflake/99_reset.sql).
 
 *note: Project made with Claude Code and Google Gemini*
